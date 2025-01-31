@@ -81,15 +81,15 @@ classification. A convolutional neural network would likely
 outperform both of these models.
 \begin{table}[h]
     \centering
-    \begin{tabular}{|c|c|c|c|}
+    \begin{tabular}{|c|c|c|c|c|}
         \hline
-        \textbf{Metric (\%)} & \textbf{3-Layer Model} &
-        \textbf{5-Layer Model} & \textbf{$\Delta$} \\
+        & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1 Score} \\
         \hline
-        Accuracy & 49.3 & 50.6 & 2.59 \\
-        Precision & 49.8 & 51.6 & 3.37 \\
-        Recall & 49.3 & 50.6 & 2.59 \\ 
-        F1 Score & 48.2 & 50.1 & 3.69 \\
+        \textbf{1a: 3-Layer Model} & 49.3 & 49.8 & 49.3 & 48.2 \\
+        \hline
+        \textbf{1b: 5-Layer Model} & 50.6 & 51.6 & 50.6 & 50.1 \\
+        \hline
+        \textbf{\Large$\Delta_{a \rightarrow b}$} & 2.59 & 3.37 & 2.59 & 3.69 \\
         \hline
     \end{tabular}
     \caption{Comparison of Evaluation Metrics}
@@ -99,19 +99,100 @@ outperform both of these models.
 
 \section{Problem 2: Housing Price Regression}
 \begin{enumerate}[label=1\alph*. ]
-    \item \textit{Perceptron Regressor}
+    \item \textit{ML Perceptron Regressor}
     
     The housing dataset has several categorical features. In
-    order to use this data to train the model, the categorical values like
-    'yes' or 'no' were converted to 1 and 0 repsectively. Using 2 layers,
-    woth 64 and 32 neurons respectively, the model was trained for 500 epochs.
-    As seen in the curves graphed in Figure \ref{fig:loss_2a}, the model has
+    order to use this data to train the model, the
+    categorical values like 'yes' or 'no' were converted to
+    1 and 0 respectively. Using 3 layers, with each , the
+    model was trained for 750 epochs. As seen in the curves
+    graphed in Figure \ref{fig:loss_2a}, the model converged
+    to its optimal solution. However, the gap between the
+    training and validation losses indicates significant
+    overfit.
     \begin{figure}[h]
         \centering
         \includegraphics[width=0.5\textwidth]{images/loss_2a.png}
         \caption{Loss and Accuracy Curves for Perceptron Regressor}
         \label{fig:loss_2a}
     \end{figure}
+
+    \item \textit{One-Hot Encoding}
+    
+    Instead of converting the categorical data to numerical
+    values, one-hot encoding was used to convert each
+    categorical feature into a number of binary features
+    that correspond to each discrete value the feature could
+    take on. This prevents the model from interpreting the
+    categorical data as numerical and instead forces it to
+    treat each category as a separate feature.
+    
+    The same model architecture was used as in the previous
+    section and the model was trained for the same number of
+    epochs. The curves plotted in Figure \ref{fig:loss_2b}
+    show that the model suffered from overfitting, but it
+    was not as significant as the previous model.
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.5\textwidth]{images/loss_2b.png}
+        \caption{Loss and Accuracy Curves for One-Hot Encoding}
+        \label{fig:loss_2b}
+    \end{figure}
+
+    \item \textit{One-Hot Encoding With Increased
+    Complexity} Using the same one-hot encoding method, a more complex model was
+    trained on the dataset. This model used 512 neurons per layer, but had 8
+    hidden layers. After training the model for 750 epochs, the validation loss
+    curve began to increase due to overfit after about 150 epochs. Thus, the
+    number of training epochs for this model was reduced to 150. As the curves
+    plotted in Figure \ref{fig:loss_2c} show, the overfit was much less
+    pronounced n this model, and the number of epochs was sufficient to reach an
+    optimal solution.
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.5\textwidth]{images/loss_2c.png}
+        \caption{Loss and Accuracy Curves for One-Hot Encoding With Increased Complexity}
+        \label{fig:loss_2c}
+    \end{figure}
+
+    \newpage
+    \textbf{Comparison}
+
+    Table \ref{tab:comparison2} shows the root mean square and mean absolute
+    losses for each of the three regressor models discussed thus far.
+    Additionally, the table includes the percent difference between each pair of
+    metrics. From the difference in mean absolute error, it is clear that the one-hot encoding only slightly
+    improved the overall performance of the model when compared to the integer encoding. However, the higher
+    improvement in RMS error indicates the model tended to make fewer large
+    errors. The increased complexity of the third model greatly improved its
+    performance compared to both of the previously explored models, however. The
+    increased complexity allowed the model to learn more about the training
+    data, and it was by far the best performing model.
+
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{|c|c|c|}
+            \hline
+             & \textbf{RMS Error} & \textbf{MAE} \\
+            \hline
+            \textbf{2a: Integer Encoding} & $2.62 \times 10^{6}$ & $1.98 \times 10^{6}$  \\
+            \hline
+            \textbf{2b: One-Hot Encoding} & $2.56 \times 10^{6}$ & $1.96 \times 10^{6}$\\
+            \hline
+            \textbf{2c: Complex One-Hot Model} & $2.35 \times 10^{6}$ & $1.80 \times 10^{6}$\\
+            \hline
+            \textbf{\large $\Delta_{a \rightarrow b}$\%} & 2.63 & 0.65 \\
+            \hline
+            \textbf{\large $\Delta_{a \rightarrow c}$\%} & 10.58 & 8.48 \\
+            \hline
+            \textbf{\large $\Delta_{b \rightarrow c}$\%} & 8.17 & 7.88 \\
+            \hline
+        \end{tabular}
+        \caption{Comparison of Evaluation Metrics}
+        \label{tab:comparison2}
+    \end{table}
+
 
 
 \end{enumerate}
