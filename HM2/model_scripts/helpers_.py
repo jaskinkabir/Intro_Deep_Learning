@@ -101,38 +101,6 @@ def get_cifar(
     cifar_val = cifar(data_path, train=False, download=redownload, transform=transform)
     return cifar_train, cifar_val
 
-def get_cifar_loaders(
-    is_cifar10,
-    train_batch_size,
-    val_batch_size,
-    train_workers,
-    train_cpu_prefetch,
-    train_gpu_prefetch,
-    val_workers,
-    val_cpu_prefetch,
-    val_gpu_prefetch,
-    recompute=False,
-    redownload=False,
-    data_path='./data',
-):
-    cifar_train, cifar_val = get_cifar(is_cifar10, recompute, redownload, data_path)
-    train_loader = gen_data_loader(
-        cifar_train,
-        train_batch_size,
-        train_workers-val_workers,
-        train_cpu_prefetch-train_gpu_prefetch,
-        train_gpu_prefetch-train_cpu_prefetch
-    )
-    val_loader = gen_data_loader(
-        cifar_val,
-        val_batch_size,
-        val_workers,
-        val_cpu_prefetch,
-        val_gpu_prefetch
-    )
-    return train_loader, val_loader
-    
-
 def get_val_tensor(data):
     val_x = torch.empty(len(data), *data[0][0].shape, device='cuda')
     val_y = torch.empty(len(data), device='cuda', dtype=torch.long)
@@ -242,8 +210,7 @@ class Classifier(nn.Module):
             header_epoch = 15,
             sched_factor = 0.1,
             sched_patience = 5,
-            min_accuracy = 0.5,
-            max_negative_diff_count = 6
+            min_accuracy = 0.5
         ):  
             
             scaler = GradScaler("cuda")
@@ -278,9 +245,7 @@ class Classifier(nn.Module):
                 print(f'Training {self.__class__.__name__}\n')
                 print(divider_string)
             max_accuracy = torch.zeros(1, device=device)            
-            negative_acc_diff_count = 0
             for epoch in range(epochs):
-                
                 begin_epoch = time.time()
                 self.train()
                 
@@ -339,11 +304,6 @@ class Classifier(nn.Module):
                     epoch_duration = end_epoch - begin_epoch
                     overfit = 100 * (val_loss - train_loss) / train_loss
                     d_accuracy = torch.zeros(1) if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
-                    if d_accuracy <= 0:
-                        negative_acc_diff_count += 1
-                    else:
-                        negative_acc_diff_count = 0
-
                     if accuracy > max_accuracy:
                         max_accuracy = accuracy
                     
@@ -361,8 +321,9 @@ class Classifier(nn.Module):
                     print('|')
                     print(divider_string)
                     
-                if accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count:
+                if accuracy > min_accuracy:
                     break
+                
 
             print(f'\nTraining Time: {training_time} seconds\n')
             
@@ -567,6 +528,7 @@ class VggNet(Classifier):
             num_classes,
             block_params: list = [],
             fc_layers = [],
+            dropout=0.5
         ):
         self.sequential == nn.Sequential()
         super().__init__()
@@ -576,6 +538,7 @@ class VggNet(Classifier):
             else:
                 block_params[i][0].in_chan = block_params[i-1][0].out_chan
             self.sequential.add_module(name=f'block_{i}', module=VggBlock(**block_params[i][0].__dict__(), repitions=block_params[i][1]))
+            self.sequential.add_module(name=f'dropout_{i}', module=nn.Dropout(dropout))
         self.sequential.add_module(name='flatten', module=nn.Flatten())
         dummy_in = torch.randn(1, in_chan, *in_dim).to(device)
         dummy_out = self.sequential(dummy_in)
@@ -590,6 +553,7 @@ class VggNet(Classifier):
             self.sequential.add_module(name=f'linear_{i}', module=nn.Sequential(
                 nn.Linear(layer_in, fc_layers[i]),
                 nn.ReLU(),
+                nn.Dropout(dropout)
             ))
         self.sequential.add_module(name = 'output', module=nn.Linear(fc_layers[-1], num_classes))        
         self.sequential = self.sequential.to(device)
