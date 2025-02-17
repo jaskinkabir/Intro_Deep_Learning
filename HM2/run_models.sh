@@ -1,13 +1,8 @@
+# loop over every python file in model_scripts, echo the name of the file and a seperator line, then run the file
 source ../env/bin/activate
-
-echo "Alex 10 DP"
-echo "-----------------------------------------"
-python3.11 model_scripts/alex_10_dp.py
-
-echo "Alex 10 NDP"
-echo "-----------------------------------------"
-python3.11 model_scripts/alex_10_ndp.py
-
-echo "Alex 100 NDP"
-echo "-----------------------------------------"
-python3.11 model_scripts/alex_100_ndp.py
+for file in model_scripts/*.py
+do
+    echo $file
+    echo "-----------------------------------------"
+    python3.11 $file
+done
