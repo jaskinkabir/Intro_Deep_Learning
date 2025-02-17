@@ -194,10 +194,16 @@ class Classifier(nn.Module):
                 print(f'{key.capitalize()}:\n{value}')
             else:
                 print(f'{key.capitalize()}: {value}')
+    def remove_zeros(self, array):
+        return [x for x in array if x != 0]
     def plot_training(self, title: str):
         loss_hist = self.train_loss_hist.cpu().detach().numpy()
+        loss_hist = self.remove_zeros(loss_hist)
+        
         val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
+        val_loss_hist = self.remove_zeros(val_loss_hist)
         validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
+        validation_accuracy_hist = self.remove_zeros(validation_accuracy_hist)
         
         fig, ax = plt.subplots(1,2, sharex=True)
         fig.suptitle(title)
@@ -206,14 +212,14 @@ class Classifier(nn.Module):
         ax[0].set_ylabel('Loss')
         ax[0].plot(loss_hist, label='Training Loss')
         ax[0].plot(val_loss_hist, label='Validation Loss')
-        
+        plt.legend()
         
         ax[1].set_title('Accuracy')
         ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('Accuracy')
+        ax[1].set_ylabel('Validation Accuracy')
         ax[1].plot(validation_accuracy_hist, label='Validation Accuracy')
         
-        plt.legend()
+        
         plt.show()
     def plot_confusion_matrix(self, title):
         if not hasattr(self, 'last_results'):
