@@ -244,4 +244,12 @@ class ConvParams:
             'stride': self.stride,
             'padding': self.padding
         }
+    def as_list(self):
+        return [
+            self.kernel,
+            self.out_chan,
+            self.stride,
+            self.padding,
+            self.in_chan
+        ]
         
