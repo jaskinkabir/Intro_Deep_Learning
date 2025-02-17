@@ -1,0 +1,19 @@
+Begin init data loader
+Batch Size: 6.0 MiB
+Data Size: 292.96875 GiB
+Data Loader init time: 1.210700 s
+Begin init fetcher
+Fetcher init time: 1.251317 s
+Begin init data loader
+Batch Size: 6.0 MiB
+Data Size: 58.59375 GiB
+Data Loader init time: 0.315914 s
+Begin init fetcher
+Fetcher init time: 0.336296 s
+torch.Size([1, 100])
+Model: alex_100_dp
+--------------------------------------------------
+Num Params: 161438820
+Training AlexNet
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

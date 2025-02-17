@@ -1,9 +1,10 @@
 from helpers import *
 
+
 cifar_10_train_loader, cifar_10_val_loader = get_cifar_loaders(
     is_cifar10=True,
-    train_batch_size=256,
-    val_batch_size=256,
+    train_batch_size=512,
+    val_batch_size=512,
     train_workers=6,
     train_cpu_prefetch=10,
     train_gpu_prefetch=10,

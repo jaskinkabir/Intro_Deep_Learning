@@ -120,8 +120,8 @@ def get_cifar_loaders(
         cifar_train,
         train_batch_size,
         train_workers-val_workers,
-        train_cpu_prefetch-train_gpu_prefetch,
-        train_gpu_prefetch-train_cpu_prefetch
+        train_cpu_prefetch-val_gpu_prefetch,
+        train_gpu_prefetch-val_cpu_prefetch
     )
     val_loader = gen_data_loader(
         cifar_val,
@@ -196,9 +196,8 @@ class Classifier(nn.Module):
                 print(f'{key.capitalize()}: {value}')
     def plot_training(self, title: str):
         loss_hist = self.train_loss_hist.cpu().detach().numpy()
-        val_loss_hist = self.val_hist.cpu().detach().numpy()
-        accuracy_hist = self.train_accuracy_hist.cpu().detach().numpy()
-        validation_accuracy_hist = self.validation_accuracy_hist.cpu().detach().numpy()
+        val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
+        validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
         
         fig, ax = plt.subplots(1,2, sharex=True)
         fig.suptitle(title)
@@ -212,7 +211,6 @@ class Classifier(nn.Module):
         ax[1].set_title('Accuracy')
         ax[1].set_xlabel('Epoch')
         ax[1].set_ylabel('Accuracy')
-        ax[1].plot(accuracy_hist, label='Training Accuracy')
         ax[1].plot(validation_accuracy_hist, label='Validation Accuracy')
         
         plt.legend()
@@ -250,9 +248,9 @@ class Classifier(nn.Module):
             optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=sched_patience, factor=sched_factor)
             training_time = 0
-            train_hist = torch.zeros(epochs, device=device)
-            val_hist = torch.zeros(epochs, device=device)
-            accuracy_hist = torch.zeros(epochs, device=device)
+            self.train_loss_hist = torch.zeros(epochs, device=device)
+            self.val_loss_hist = torch.zeros(epochs, device=device)
+            self.accuracy_hist = torch.zeros(epochs, device=device)
             
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -299,7 +297,7 @@ class Classifier(nn.Module):
                 training_time += time.time() - start_time
                 
                 train_loss = train_loss/len(train_loader.data_iterable)
-                train_hist[epoch] = train_loss
+                self.train_loss_hist[epoch] = train_loss
                 
                 del X_batch
                 del Y_batch
@@ -325,8 +323,8 @@ class Classifier(nn.Module):
                         
                 accuracy = val_correct/len(val_loader.data_iterable.dataset)
                 val_loss = val_loss/len(val_loader.data_iterable)
-                val_hist[epoch] = val_loss                   
-                accuracy_hist[epoch] = accuracy
+                self.val_loss_hist[epoch] = val_loss                   
+                self.accuracy_hist[epoch] = accuracy
                 
                 scheduler.step(accuracy)
                 
@@ -365,11 +363,8 @@ class Classifier(nn.Module):
                     break
 
             print(f'\nTraining Time: {training_time} seconds\n')
-            
-            self.train_hist = train_hist
-            self.val_hist = val_hist
-            self.accuracy_hist = accuracy_hist
-            self.last_val = torch.tensor(val_loader.dataset.targets)
+            self.last_pred = torch.tensor(Y_pred_eval)
+            self.last_val = torch.tensor(val_loader.data_iterable.dataset.targets)
     def train_model_old(
             self,
             epochs: int,

@@ -1,5 +1,6 @@
 from helpers import *
-
+from os import chdir
+chdir('..')
 cifar_10_train_loader, cifar_10_val_loader = get_cifar_loaders(
     is_cifar10=True,
     train_batch_size=256,
