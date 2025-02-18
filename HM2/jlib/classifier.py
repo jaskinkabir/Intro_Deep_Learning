@@ -71,12 +71,11 @@ class Classifier(nn.Module):
         ax[0].plot(val_loss_hist, label='Validation Loss')
         ax[0].legend()
         
-        ax[1].set_title('Accuracy')
+        ax[1].set_title('Validation Accuracy')
         ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('Accuracy')
+        ax[1].set_ylabel('%')
         ax[1].plot(validation_accuracy_hist)
-        fig.show()
-        
+        return fig        
         #plt.show()
     def plot_confusion_matrix(self, title):
         if not hasattr(self, 'last_results'):
