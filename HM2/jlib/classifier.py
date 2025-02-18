@@ -69,15 +69,15 @@ class Classifier(nn.Module):
         ax[0].set_ylabel('Loss')
         ax[0].plot(loss_hist, label='Training Loss')
         ax[0].plot(val_loss_hist, label='Validation Loss')
-        plt.legend()
+        ax[0].legend()
         
         ax[1].set_title('Accuracy')
         ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('Validation Accuracy')
-        ax[1].plot(validation_accuracy_hist, label='Validation Accuracy')
-        plt.legend()
+        ax[1].set_ylabel('Accuracy')
+        ax[1].plot(validation_accuracy_hist)
+        fig.show()
         
-        plt.show()
+        #plt.show()
     def plot_confusion_matrix(self, title):
         if not hasattr(self, 'last_results'):
             self.get_results()
@@ -143,30 +143,34 @@ class Classifier(nn.Module):
             for epoch in range(epochs):
                 
                 begin_epoch = time.time()
-                self.train()
-                
                 start_time = time.time()
+                
                 train_loss = 0
+                total_train_samples = 0
+                self.train()
                 for X_batch, Y_batch in train_loader:
+                    batch_size = X_batch.size(0)
                     optimizer.zero_grad(set_to_none=True)
                     with autocast("cuda"):
                         Y_pred = self.forward(X_batch)
-                        loss = loss_fn(Y_pred, Y_batch)
+                        loss = loss_fn(Y_pred, Y_batch) 
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
-                    scaler.update()
-                    
-                    train_loss += loss
+                    scaler.update()                   
+
+                    train_loss += loss.item() * batch_size
+                    total_train_samples += batch_size
                 training_time += time.time() - start_time
                 
-                train_loss = train_loss/len(train_loader.data_iterable)
+                train_loss = train_loss/total_train_samples
                 self.train_loss_hist[epoch] = train_loss
                 
                 del X_batch
                 del Y_batch
                 val_start = time.time()
-                val_correct = torch.zeros(1).to(device)
-                val_loss = torch.zeros(1).to(device)
+                val_correct = 0
+                val_loss = 0
+                total_val_samples = 0
                 
                 self.eval()
                 with torch.no_grad():
@@ -175,20 +179,24 @@ class Classifier(nn.Module):
                     idx = 0
                     for X_val_batch, Y_val_batch in val_loader:
                         batch_size = X_val_batch.size(0)
-                        Y_pred_logits = self.forward(X_val_batch)
-                        val_loss += loss_fn(Y_pred_logits, Y_val_batch)
+                        with autocast('cuda'):
+                            Y_pred_logits = self.forward(X_val_batch)
+                            batch_loss = loss_fn(Y_pred_logits, Y_val_batch) * batch_size
+                        val_loss += batch_loss.item()
                         
                         Y_pred = nn.functional.log_softmax(Y_pred_logits, dim=1).argmax(dim=1)
                         Y_pred_eval[idx:idx + batch_size] = Y_pred
                         val_correct += (Y_pred == Y_val_batch).sum()
                         idx += batch_size
-                val_time = time.time() - val_start
                         
-                accuracy = val_correct/len(val_loader.data_iterable.dataset)
-                val_loss = val_loss/len(val_loader.data_iterable)
+                        total_val_samples += batch_size
+                val_time = time.time() - val_start
+                    
+                accuracy = val_correct/total_val_samples
+                val_loss = val_loss/total_val_samples
                 self.val_loss_hist[epoch] = val_loss                   
                 self.accuracy_hist[epoch] = accuracy
-                
+                del X_val_batch, Y_val_batch
                 scheduler.step(accuracy)
                 
                 end_epoch = time.time()
@@ -211,10 +219,10 @@ class Classifier(nn.Module):
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
                     epoch_inspection['Validation Time'] = f'{val_time:4f}'
-                    epoch_inspection['Training Loss'] = f'{train_loss.item():8f}'
-                    epoch_inspection['Test Loss '] = f'{val_loss.item():8f}'
-                    epoch_inspection['Overfit (%)'] = f'{overfit.item():4f}'
-                    epoch_inspection['Accuracy (%)'] = f'{accuracy.item()*100:4f}'
+                    epoch_inspection['Training Loss'] = f'{train_loss:8f}'
+                    epoch_inspection['Test Loss '] = f'{val_loss:8f}'
+                    epoch_inspection['Overfit (%)'] = f'{overfit:4f}'
+                    epoch_inspection['Accuracy (%)'] = f'{accuracy*100:4f}'
                     epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy.item():4f}'
                     epoch_inspection["GPU Memory (GiB)"] = f'{mem:2f}'
                     for value in epoch_inspection.values():
