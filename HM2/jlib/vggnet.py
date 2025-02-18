@@ -17,25 +17,32 @@ class VggBlock(nn.Module):
         params: ConvParams,
         pool_kernel = 2,
         pool_stride = 2,
-        repitions = 2,
+        repititions = 2,
     ):
         super().__init__()
+        self.params = params
+        self.pool_kernel = pool_kernel
+        self.pool_stride = pool_stride
+        self.repititions = repititions
+        self.computation = nn.Sequential()
         #param0 = ConvParams(*params.as_list())
         #param0.in_chan = params.in_chan
         #params.in_chan = params.out_chan
+    def build(self):
         convreulus = []
-        for i in range(repitions):
+        for i in range(self.repititions):
             if i == 0:
-                convreulus.append(get_conv_relu(params))
-                params.in_chan = params.out_chan
+                convreulus.append(get_conv_relu(self.params))
+                self.params.in_chan = self.params.out_chan
             else:
-                convreulus.append(get_conv_relu(params))
+                convreulus.append(get_conv_relu(self.params))
             
         self.computation = nn.Sequential(
             *convreulus,
-            nn.MaxPool2d(pool_kernel, pool_stride),
         )
-        self.pool = nn.MaxPool2d(pool_kernel, pool_stride)
+        if self.pool_kernel:
+            self.computation.add_module('pool', nn.MaxPool2d(self.pool_kernel, self.pool_stride))
+        
     def forward(self, x):
         return self.computation(x)
 
@@ -45,7 +52,7 @@ class VggNet(Classifier):
             in_chan,
             in_dim,
             num_classes,
-            block_params: list = [],
+            block_params: list[VggBlock] = [],
             fc_params = [],
             dropout = 0
         ):
@@ -54,10 +61,11 @@ class VggNet(Classifier):
         
         for i in range(len(block_params)):
             if i == 0:
-                block_params[i][1].in_chan = in_chan
+                block_params[i].params.in_chan = in_chan
             else:
-                block_params[i][1].in_chan = block_params[i-1][1].out_chan
-            self.sequential.add_module(name=f'block_{i}', module=VggBlock(params=block_params[i][1], repitions=block_params[i][0]))
+                block_params[i].params.in_chan = block_params[i-1].params.out_chan
+            block_params[i].build()
+            self.sequential.add_module(name=f'block_{i}', module=block_params[i])
             self.sequential.add_module(name = f"dropout_{i}", module=nn.Dropout(dropout))
         self.sequential.add_module(name='flatten', module=nn.Flatten())
         self.sequential.to(device)

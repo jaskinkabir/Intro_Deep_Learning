@@ -237,11 +237,11 @@ class Classifier(nn.Module):
             
 class ConvParams:
     def __init__(self, kernel, out_chan, stride=1, padding='same', in_chan=0,):
-        self.kernel = kernel
-        self.in_chan = in_chan
-        self.out_chan = out_chan
-        self.stride = stride
-        self.padding = padding
+        self.kernel: int = kernel
+        self.in_chan: int = in_chan
+        self.out_chan: int = out_chan
+        self.stride: int = stride
+        self.padding: str = padding
     def __dict__(self):
         return {
             'kernel_size': self.kernel,
