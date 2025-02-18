@@ -12,9 +12,7 @@ class AlexBlock(nn.Module):
     ):
         super().__init__()
         self.computation = nn.Sequential(
-            # With batchnorm, bias is unnecessary
-            nn.Conv2d(**params.__dict__(), bias=False),
-            nn.BatchNorm2d(params.out_chan),
+            nn.Conv2d(**params.__dict__()),
             nn.ReLU(),
             nn.MaxPool2d(pool_kernel, pool_stride)
         )
@@ -63,7 +61,7 @@ class AlexNet(Classifier):
         ), name = 'flatten')
         self.sequential = self.sequential.to(device)
         
-        dummy_in = torch.randn(1, in_chan, *in_dim).to(device)  # Add batch dimension
+        dummy_in = torch.randn(1, in_chan, *in_dim).to(device)  
         dummy_out = self.sequential(dummy_in)
         fc_in = dummy_out.shape[1]
         self.sequential.add_module(name='linear_0', module=nn.Linear(fc_in, fc_layers[0]))
@@ -72,7 +70,8 @@ class AlexNet(Classifier):
         for i in range(1, len(fc_layers)):
             self.sequential.add_module(name=f'linear_{i}', module=nn.Sequential(
                 nn.Linear(fc_layers[i-1], fc_layers[i]),
-                nn.ReLU()
+                nn.ReLU(),
+                nn.Dropout(dropout)
             ))
         self.sequential.add_module(name = 'output', module=nn.Linear(fc_layers[-1], num_classes))        
         self.sequential = self.sequential.to(device)

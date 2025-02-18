@@ -164,8 +164,7 @@ class Classifier(nn.Module):
                 train_loss = train_loss/total_train_samples
                 self.train_loss_hist[epoch] = train_loss
                 
-                del X_batch
-                del Y_batch
+                del X_batch, Y_batch, loss, Y_pred
                 val_start = time.time()
                 val_correct = 0
                 val_loss = 0
@@ -183,9 +182,9 @@ class Classifier(nn.Module):
                             batch_loss = loss_fn(Y_pred_logits, Y_val_batch) * batch_size
                         val_loss += batch_loss.item()
                         
-                        Y_pred = nn.functional.log_softmax(Y_pred_logits, dim=1).argmax(dim=1)
+                        Y_pred = Y_pred_logits.argmax(dim=1)
                         Y_pred_eval[idx:idx + batch_size] = Y_pred
-                        val_correct += (Y_pred == Y_val_batch).sum()
+                        val_correct += (Y_pred == Y_val_batch).sum().item()
                         idx += batch_size
                         
                         total_val_samples += batch_size
@@ -195,7 +194,7 @@ class Classifier(nn.Module):
                 val_loss = val_loss/total_val_samples
                 self.val_loss_hist[epoch] = val_loss                   
                 self.accuracy_hist[epoch] = accuracy
-                del X_val_batch, Y_val_batch
+                del X_val_batch, Y_val_batch, Y_pred_logits, Y_pred
                 scheduler.step(accuracy)
                 
                 end_epoch = time.time()
@@ -206,7 +205,7 @@ class Classifier(nn.Module):
                         print(divider_string)
                     epoch_duration = end_epoch - begin_epoch
                     overfit = 100 * (val_loss - train_loss) / train_loss
-                    d_accuracy = torch.zeros(1) if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
+                    d_accuracy = 0 if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
                     if d_accuracy <= 0:
                         negative_acc_diff_count += 1
                     else:
@@ -222,7 +221,7 @@ class Classifier(nn.Module):
                     epoch_inspection['Test Loss '] = f'{val_loss:8f}'
                     epoch_inspection['Overfit (%)'] = f'{overfit:4f}'
                     epoch_inspection['Accuracy (%)'] = f'{accuracy*100:4f}'
-                    epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy.item():4f}'
+                    epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy:4f}'
                     epoch_inspection["GPU Memory (GiB)"] = f'{mem:2f}'
                     for value in epoch_inspection.values():
                         print(f"|{value:^{cell_width}}", end='')

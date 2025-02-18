@@ -42,6 +42,7 @@ def gen_data_loader(
         num_workers=workers,
         prefetch_factor=cpu_prefetch,
         pin_memory=True,
+        shuffle=True
     )
     
     X_batch = next(iter(loader))[0]
