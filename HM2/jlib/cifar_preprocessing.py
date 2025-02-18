@@ -46,9 +46,9 @@ def gen_data_loader(
     )
     
     X_batch = next(iter(loader))[0]
+    batch_space = X_batch.element_size() * X_batch.nelement() / 1024**2
     
-    print(f"Batch Size: {X_batch.element_size() * X_batch.nelement() / 1024**2} MiB")
-    print(f"Data Size: {X_batch.element_size() * data.__len__() * X_batch.nelement() / 1024**3} GiB")
+    print(f"Batch Size: {batch_space} MiB")
     print(f"Data Loader init time: {time.perf_counter() - start:2f} s")
     print("Begin init fetcher")
     fetcher = CudaDataPrefetcher(
@@ -98,29 +98,49 @@ def get_cifar_loaders(
     is_cifar10,
     train_batch_size,
     val_batch_size,
-    train_workers,
-    train_cpu_prefetch,
-    train_gpu_prefetch,
-    val_workers,
-    val_cpu_prefetch,
-    val_gpu_prefetch,
     recompute=False,
     redownload=False,
     data_path='./data',
+    workers=15
 ):
+    max_gpu_mem = 6000
+    max_train_mem = max_gpu_mem * 2 // 3
+    max_val_mem = max_gpu_mem // 3
+    
+    train_workers = workers * 2 // 3
+    val_workers = workers // 3
+    
+    mem_per_img = 3 * 32 * 32 * 4 / 1024**2
+    train_batch_space = train_batch_size * mem_per_img
+    train_gpu_prefetch = max_train_mem // train_batch_space
+    train_cpu_prefetch = train_gpu_prefetch // train_workers
+    
+    val_batch_space = val_batch_size * mem_per_img
+    val_gpu_prefetch = max_val_mem // val_batch_space
+    val_cpu_prefetch = val_gpu_prefetch // val_workers
+    print(f"Train GPU Prefetch: {train_gpu_prefetch}")
+    print(f"Train CPU Prefetch: {train_cpu_prefetch}")
+    print(f"Val GPU Prefetch: {val_gpu_prefetch}")
+    print(f"Val CPU Prefetch: {val_cpu_prefetch}")
+    
+    
+    
+    
     cifar_train, cifar_val = get_cifar(is_cifar10, recompute, redownload, data_path)
+    print("Train Loader")
     train_loader = gen_data_loader(
         cifar_train,
         train_batch_size,
-        train_workers-val_workers,
-        train_cpu_prefetch-val_gpu_prefetch,
-        train_gpu_prefetch-val_cpu_prefetch
+        train_workers,
+        int(train_cpu_prefetch),
+        int(train_gpu_prefetch)
     )
+    print("Val Loader")
     val_loader = gen_data_loader(
         cifar_val,
         val_batch_size,
         val_workers,
-        val_cpu_prefetch,
-        val_gpu_prefetch
+        int(val_cpu_prefetch),
+        int(val_gpu_prefetch)
     )
     return train_loader, val_loader
