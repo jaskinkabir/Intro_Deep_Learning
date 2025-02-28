@@ -20,7 +20,9 @@ class ShakespeareRNN(Classifier):
         linear_out = alphabet_size
         for i, layer_size in enumerate(linear_network):
             self.fc.add_module(f'linear_{i}', nn.Linear(linear_in, layer_size))
+            self.fc.add_module(f'batchnorm_{i}', nn.BatchNorm1d(layer_size))
             self.fc.add_module(f'relu_{i}', nn.ReLU())
+            self.fc.add_module(f'dropout_{i}', nn.Dropout())
             linear_in = layer_size
         self.fc.add_module('final_linear', nn.Linear(linear_in, linear_out))
         
@@ -47,32 +49,23 @@ def train_and_plot(train, val, model: ShakespeareRNN, name, *training_args, **tr
     fig = model.plot_training(f"{name} Training")
     fig.savefig(f"images/{name}_training_new.png")
 
-data_20 = gen_datasets(20)
+# data_20 = gen_datasets(20)
 
-train_20 = gen_data_loader(
-    data = data_20['train_dataset'],
-    batch_size=2**13,
-    workers = 12,
-    cpu_prefetch=10,
-    gpu_prefetch=10,
-    clear = True
+data_20 = get_shakespeare_loaders(
+    train_batch_size=2**15,
+    val_batch_size=2**15,
+    sequence_length=20,
 )
-val_20 = gen_data_loader(
-    data = data_20['train_dataset'],
-    batch_size=2**15,
-    workers = 4,
-    cpu_prefetch=10,
-    gpu_prefetch=10,
-    clear = False
-)
+
 lstm20 = ShakespeareRNN(
     alphabet_size=len(data_20['chars']),
     hidden_size=128,
     rnn=nn.LSTM,
 ).to('cuda')
+
 train_and_plot(
-    train_20,
-    val_20,
+    data_20['train_loader'],
+    data_20['val_loader'],
     lstm20,
     "LSTM-20",
     epochs=50,

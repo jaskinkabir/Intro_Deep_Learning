@@ -105,7 +105,7 @@ class Classifier(nn.Module):
             min_accuracy = 0.5,
             max_negative_diff_count = 6
         ):  
-            
+            self.last_val = torch.tensor(val_loader.data_iterable.dataset.dataset.targets)
             scaler = GradScaler("cuda")
             optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=sched_patience, factor=sched_factor)
@@ -235,7 +235,7 @@ class Classifier(nn.Module):
 
             print(f'\nTraining Time: {training_time} seconds\n')
             self.last_pred = torch.tensor(Y_pred_eval)
-            self.last_val = torch.tensor(val_loader.data_iterable.dataset.targets)
+           
             
 class ConvParams:
     def __init__(self, kernel, out_chan, stride=1, padding='same', in_chan=0,):
