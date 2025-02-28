@@ -98,7 +98,7 @@ class Classifier(nn.Module):
             optimizer=torch.optim.SGD,
             optimizer_args = [],
             optimizer_kwargs = {},
-            print_epoch=10,
+            print_epoch=1,
             header_epoch = 15,
             sched_factor = 0.1,
             sched_patience = 5,
@@ -125,7 +125,7 @@ class Classifier(nn.Module):
                 "Overfit (%)": 0,
                 "Accuracy (%)": 0,
                 "Δ Accuracy (%)": 0,
-                "Validation Time" : 0,
+                "Avg Inference Time" : 0,
                 "GPU Memory (GiB)": 0
             }
 
@@ -165,11 +165,11 @@ class Classifier(nn.Module):
                 self.train_loss_hist[epoch] = train_loss
                 
                 del X_batch, Y_batch, loss, Y_pred
-                val_start = time.time()
                 val_correct = 0
                 val_loss = 0
                 total_val_samples = 0
-                
+                total_inference_time = 0
+                inference_count = 0
                 self.eval()
                 with torch.no_grad():
                     Y_pred_eval = torch.zeros(len(val_loader.data_iterable.dataset)).to(device)
@@ -178,7 +178,10 @@ class Classifier(nn.Module):
                     for X_val_batch, Y_val_batch in val_loader:
                         batch_size = X_val_batch.size(0)
                         with autocast('cuda'):
+                            inf_start = time.time()
                             Y_pred_logits = self.forward(X_val_batch)
+                            total_inference_time += (time.time() - inf_start) / batch_size
+                            inference_count += 1
                             batch_loss = loss_fn(Y_pred_logits, Y_val_batch) * batch_size
                         val_loss += batch_loss.item()
                         
@@ -188,8 +191,7 @@ class Classifier(nn.Module):
                         idx += batch_size
                         
                         total_val_samples += batch_size
-                val_time = time.time() - val_start
-                    
+                avg_inference_time = total_inference_time / inference_count
                 accuracy = val_correct/total_val_samples
                 val_loss = val_loss/total_val_samples
                 self.val_loss_hist[epoch] = val_loss                   
@@ -216,7 +218,7 @@ class Classifier(nn.Module):
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
-                    epoch_inspection['Validation Time'] = f'{val_time:4f}'
+                    epoch_inspection['Avg Inference Time'] = f'{avg_inference_time:4e}'
                     epoch_inspection['Training Loss'] = f'{train_loss:8f}'
                     epoch_inspection['Test Loss '] = f'{val_loss:8f}'
                     epoch_inspection['Overfit (%)'] = f'{overfit:4f}'

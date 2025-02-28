@@ -4,6 +4,7 @@ from torchtnt.utils.data import CudaDataPrefetcher
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import requests
+import gc
 
 class CharDataset(Dataset):
     def __init__(self, sequences, targets):
@@ -23,13 +24,14 @@ def get_text(path, redownload=True):
         response = requests.get(url)
         text = response.text  # This is the entire text data
         with open(path, 'w+') as f:
-            path.write(text)
+            f.write(text)
     else:
         with open(path, 'r') as f:
             text = f.read()
     return text
 
-def gen_datasets(text, sequence_length):
+def gen_datasets(sequence_length, redownload=False):
+    text = get_text(f'data/shakespeare.txt', redownload)
 # Step 2: Prepare the dataset
     # Create a character mapping to integers
     chars = sorted(list(set(text)))
@@ -121,8 +123,22 @@ def get_shakespeare_loaders(
     redownload=False,
     workers=15
 ):
-    text = get_text(f'data/shakespeare.txt', redownload)
-    data = gen_datasets(text, sequence_length)
+    """
+    Returns a dictionary containing the following
+    {
+        'chars' : list[str] - Alphabet
+        'char_to_int' : dict[str, int] - Character to integer mapping
+        'int_to_char' : dict[int, str] - Integer to character mapping
+        'train_dataset' : Dataset - Training dataset
+        'val_dataset' : Dataset - Validation dataset
+        'train_loader' : DataLoader - Training data loader
+        'val_loader' : DataLoader - Validation data loader
+    }
+    """
+    
+    
+    
+    data = gen_datasets(sequence_length)
     train_dataset = data['train_dataset']
     val_dataset = data['val_dataset']
     
