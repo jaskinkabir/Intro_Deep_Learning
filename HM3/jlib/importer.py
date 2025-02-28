@@ -1,1 +1,1 @@
-from .classifier import *
+from .classifier_no_data_loaders import *

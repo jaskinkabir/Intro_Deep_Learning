@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 device = 'cuda'
 
-class ClassifierNoDataLoaders(nn.Module):
+class Classifier(nn.Module):
     @classmethod
     def compare_results(cls, results1, results2):
         print('Comparing results:')
@@ -92,10 +92,8 @@ class ClassifierNoDataLoaders(nn.Module):
     def train_model(
             self,
             epochs,
-            x_train,
-            y_train,
-            x_val,
-            y_val,
+            train_loader: CudaDataPrefetcher,
+            val_loader: CudaDataPrefetcher,
             loss_fn=nn.CrossEntropyLoss(),
             optimizer=torch.optim.SGD,
             optimizer_args = [],
@@ -145,46 +143,58 @@ class ClassifierNoDataLoaders(nn.Module):
                 
                 begin_epoch = time.time()
                 start_time = time.time()
-    
+                
+                train_loss = 0
                 total_train_samples = 0
                 self.train()
-                optimizer.zero_grad(set_to_none=True)
-                with autocast("cuda"):
-                    Y_pred = self.forward(x_train)
-                    train_loss = loss_fn(Y_pred, y_train) 
-                scaler.scale(train_loss).backward()
-                scaler.step(optimizer)
-                scaler.update()                   
+                for X_batch, Y_batch in train_loader:
+                    batch_size = X_batch.size(0)
+                    optimizer.zero_grad(set_to_none=True)
+                    with autocast("cuda"):
+                        Y_pred = self.forward(X_batch)
+                        loss = loss_fn(Y_pred, Y_batch) 
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()                   
 
-                train_loss = train_loss.item()
+                    train_loss += loss.item() * batch_size
+                    total_train_samples += batch_size
                 training_time += time.time() - start_time
                 
-                train_loss = train_loss
+                train_loss = train_loss/total_train_samples
                 self.train_loss_hist[epoch] = train_loss
                 
-                # del X_batch, Y_batch, loss, Y_pred
+                del X_batch, Y_batch, loss, Y_pred
                 val_start = time.time()
                 val_correct = 0
                 val_loss = 0
+                total_val_samples = 0
+                
                 self.eval()
                 with torch.no_grad():
-                    Y_pred_eval = torch.zeros(len(y_val), device=device)
+                    Y_pred_eval = torch.zeros(len(val_loader.data_iterable.dataset)).to(device)
                     
-                    with autocast('cuda'):
-                        Y_pred_logits = self.forward(x_val)
-                        val_loss = loss_fn(Y_pred_logits, y_val)
-                    val_loss = val_loss.item()
-                    
-                    Y_pred_eval = Y_pred_logits.argmax(dim=1)
-                    
-                    val_correct += (Y_pred_eval == y_val).sum().item()
-                    
+                    idx = 0
+                    for X_val_batch, Y_val_batch in val_loader:
+                        batch_size = X_val_batch.size(0)
+                        with autocast('cuda'):
+                            Y_pred_logits = self.forward(X_val_batch)
+                            batch_loss = loss_fn(Y_pred_logits, Y_val_batch) * batch_size
+                        val_loss += batch_loss.item()
+                        
+                        Y_pred = Y_pred_logits.argmax(dim=1)
+                        Y_pred_eval[idx:idx + batch_size] = Y_pred
+                        val_correct += (Y_pred == Y_val_batch).sum().item()
+                        idx += batch_size
+                        
+                        total_val_samples += batch_size
                 val_time = time.time() - val_start
                     
-                accuracy = val_correct/len(y_val)
+                accuracy = val_correct/total_val_samples
+                val_loss = val_loss/total_val_samples
                 self.val_loss_hist[epoch] = val_loss                   
                 self.accuracy_hist[epoch] = accuracy
-                # del X_val_batch, Y_val_batch, Y_pred_logits, Y_pred
+                del X_val_batch, Y_val_batch, Y_pred_logits, Y_pred
                 scheduler.step(accuracy)
                 
                 end_epoch = time.time()
@@ -219,12 +229,11 @@ class ClassifierNoDataLoaders(nn.Module):
                     print(divider_string)
                     
                 if accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count:
-                    #break
-                    pass
+                    break
 
             print(f'\nTraining Time: {training_time} seconds\n')
             self.last_pred = torch.tensor(Y_pred_eval)
-            self.last_val = y_val
+            self.last_val = torch.tensor(val_loader.data_iterable.dataset.targets)
             
 class ConvParams:
     def __init__(self, kernel, out_chan, stride=1, padding='same', in_chan=0,):
