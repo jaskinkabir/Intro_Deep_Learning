@@ -1,7 +1,5 @@
 import torch
 from torch import nn
-import numpy as np
-from sklearn.model_selection import train_test_split
 from jlib.char_predictor import CharPredictor
 
 text = ""
