@@ -1,0 +1,42 @@
+\documentclass{article}
+%\usepackage[margin=1in]{geometry}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{titling}
+\usepackage{enumitem}
+\usepackage{makecell}
+\usepackage{minted}
+\usepackage{url}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\renewcommand\maketitlehooka{\null\mbox{}\vfill}
+\renewcommand\maketitlehookd{\vfill\null}
+
+\begin{document}
+\input{title.tex}
+
+\section{Problem 1: Character Prediction Small Dataset}
+
+\begin{enumerate}[label=1\alph*. ]
+    \item waaa
+    \begin{figure}[htb]
+        \setkeys{Gin}{width=\linewidth}
+        \setlength\tabcolsep{2pt}
+        \begin{tabularx}{\textwidth}{XXX}
+          \includegraphics{images_p1/RNN_10_training_new.png} &
+          \includegraphics{images_p1/RNN_20_training_new.png} &
+          \includegraphics{images_p1/RNN_30_training_new.png}   \\
+          \includegraphics{images_p1/LSTM_10_training_new.png} &
+          \includegraphics{images_p1/LSTM_20_training_new.png} &
+          \includegraphics{images_p1/LSTM_30_training_new.png}   \\
+          \includegraphics{images_p1/GRU_10_training_new.png} &
+          \includegraphics{images_p1/GRU_20_training_new.png} &
+          \includegraphics{images_p1/GRU_30_training_new.png}
+        \end{tabularx}
+      \caption{Set graphics options by keys "Gin"}
+      \end{figure}
+\end{enumerate}
+
+
+\end{document}
