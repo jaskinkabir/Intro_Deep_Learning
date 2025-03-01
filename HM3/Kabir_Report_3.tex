@@ -124,56 +124,60 @@
     \end{itemize}
 
 \end{enumerate}
-
+\newpage
 \section{Problem 2: Shakespeare Character Prediction}
-
 \begin{enumerate}[label=1\alph*. ]
     \item \textit{Training Curves}
     \begin{figure}[htb]
         \setkeys{Gin}{width=\linewidth}
-        \setlength\tabcolsep{2pt}
+        \setlength\tabcolsep{0.5pt}
+        \renewcommand{\arraystretch}{0}
         \begin{tabularx}{\textwidth}{XXX}
           \includegraphics{images/LSTM-20_training_new.png} &
           \includegraphics{images/LSTM-30_training_new.png} &
-          \includegraphics{images/LSTM-50_training_new.png}   \\
-          \includegraphics{images/LSTM-Adjusted-20_training_new.png} \\
-          \includegraphics{images/LSTM-Adjusted-30_training_new.png} \\
-          \includegraphics{images/LSTM-Adjusted-50_training_new.png}
+          \includegraphics{images/LSTM-50_training_new.png} \\
+          \includegraphics{images/LSTM-Adjusted-20_training_new.png} &
+          \includegraphics{images/LSTM-Adjusted-30_training_new.png} &
+          \includegraphics{images/LSTM-Adjusted-50_training_new.png} \\
           \includegraphics{images/GRU-20_training_new.png} &
           \includegraphics{images/GRU-30_training_new.png} &
-          \includegraphics{images/GRU-50_training_new.png}   \\
-          \includegraphics{images/GRU-Adjusted-20_training_new.png} \\
-          \includegraphics{images/GRU-Adjusted-30_training_new.png} \\
+          \includegraphics{images/GRU-50_training_new.png} \\
+          \includegraphics{images/GRU-Adjusted-20_training_new.png} &
+          \includegraphics{images/GRU-Adjusted-30_training_new.png} &
           \includegraphics{images/GRU-Adjusted-50_training_new.png}
         \end{tabularx}
-        \caption{Problem 1 Training Curves}
-        \label{fig:p1}
+        \caption{Problem 2 Training Curves}
+        \label{fig:p2}
       \end{figure}
       \newpage
     \item \textit{Results Comparison}
     \begin{table}[h]
         \centering
         \renewcommand{\arraystretch}{1.5}
-        \begin{tabular}{|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
+        \begin{tabular}{|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
         %\begin{tabular}{|l|r|r|r|r|}
             \hline
-            \textbf{Model} & \textbf{Parameter Count} & \textbf{Training Time (s)} & \textbf{Overfit (\%)} & \textbf{Accuracy (\%)} \\
+            \textbf{Model} & \textbf{Parameter Count} & \textbf{Training Time (s)} & \textbf{Inference Time (s)} & \textbf{Overfit (\%)} & \textbf{Accuracy (\%)} \\
             \hline
-            \textbf{RNN-10}  & 44846  & 1.93  & 389.68  & 49.58 \\
-            \textbf{RNN-20}  & 44846  & 3.65  & 185.97  & 51.05 \\
-            \textbf{RNN-30}  & 44846  & 5.24  & 235.41  & 48.31 \\
+            \textbf{LSTM-20}  & 44846  & 1.93  & 389.68  & 49.58 \\
+            \textbf{LSTM-30}  & 44846  & 3.65  & 185.97  & 51.05 \\
+            \textbf{LSTM-50}  & 44846  & 5.24  & 235.41  & 48.31 \\
             \hline
-            \textbf{LSTM-10} & 143918 & 5.79  & 253.80  & 48.95 \\
-            \textbf{LSTM-20} & 143918 & 11.21 & 381.00  & 53.16 \\
-            \textbf{LSTM-30} & 143918 & 18.23 & 399.18  & 50.00 \\
+            \textbf{LSTM-Adjusted-20} & 143918 & 5.79  & 253.80  & 48.95 \\
+            \textbf{LSTM-Adjusted-30} & 143918 & 11.21 & 381.00  & 53.16 \\
+            \textbf{LSTM-Adjusted-50} & 143918 & 18.23 & 399.18  & 50.00 \\
             \hline
-            \textbf{GRU-10}  & 110894 & 5.30  & 329.01  & 51.89 \\
-            \textbf{GRU-20}  & 110894 & 9.88  & 347.95  & 54.01 \\
-            \textbf{GRU-30}  & 110894 & 15.41 & 460.00  & 50.85 \\
+            \textbf{GRU-20}  & 110894 & 5.30  & 329.01  & 51.89 \\
+            \textbf{GRU-30}  & 110894 & 9.88  & 347.95  & 54.01 \\
+            \textbf{GRU-50}  & 110894 & 15.41 & 460.00  & 50.85 \\
+            \hline
+            \textbf{GRU-Adjusted-20}  & 110894 & 5.30  & 329.01  & 51.89 \\
+            \textbf{GRU-Adjusted-30}  & 110894 & 9.88  & 347.95  & 54.01 \\
+            \textbf{GRU-Adjusted-50}  & 110894 & 15.41 & 460.00  & 50.85 \\
             \hline
         \end{tabular}
-        \caption{Problem 1 Data Comparison}
-        \label{tab:p1}
+        \caption{Problem 2 Data Comparison}
+        \label{tab:p2}
     \end{table}
     \item \textit{Discussion} 
     \begin{itemize}
