@@ -228,36 +228,24 @@
             all samples in the batch are computed in
             parallel.
 
-        \item Overfitting
+        \item Overfitting 
         
-            For the best sequence length of 20, the RNN had
-            the lowest overfit and the LSTM the highest. This
-            is likely a result of the difference in
-            complexity between the architectures. The most
-            complex model, the LSTM, had the highest
-            overfit.
-
-            Interestingly, for the sequence length of 10,
-            the RNN the highest overfit while the LSTM had
-            the lowest. This could be due to the RNN not
-            having enough information to memorize the
-            training data, while the LSTM was able to
-            memorize more from the shorter sequences.
-
-            For the sequence length of 30, the GRU had the
-            highest overfit and the RNN the lowest. As the
-            GRU was the most effective at generalizing from
-            the training data, it makes sense that it would
-            also overfit the most
+            Both models were almost equally
+            susceptible to overfit, and the adjustments made
+            to the models eliminated this overfit thanks to
+            the dropout layers.
         
         \item Accuracy
         
-            Across all sequence lengths, the GRU was the
-            most accurate and the RNN the least. The LSTM
-            was in the middle. This is likely due to the
-            complexity of the LSTM and the simplicity of the
-            RNN. The GRU is a good compromise between the
-            two, which is why it performed the best.
+            The GRU was more accurate than the LSTM for all
+            sequence lengths, and the adjustments made to
+            the models improved their accuracy. However,
+            these differences are small and likely not
+            significant. The adjusted GRU trained on a
+            sequence length of 30 was the most accurate
+            model, and the LSTM trained on a sequence length
+            of 20 the least. The difference between the two
+            was just 1\%.
 
     
     \end{itemize}
