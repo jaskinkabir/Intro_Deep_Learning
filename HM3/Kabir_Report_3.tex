@@ -181,29 +181,51 @@
     \end{table}
     \item \textit{Discussion} 
     \begin{itemize}
+        \item Hyperparameter and Architecture Modifications
+            To improve the LSTM's performance, the sequence
+            length was reduced to 100 and two dense layers
+            with batch normalization and dropout were added
+            to the end of the model. These layers had 128
+            and 64 neurons. The GRU was also modified in the
+            same way, but the dense layers both had 256
+            neurons. Additionally, because of the dropout
+            layers, the learning rate was increased tenfold.
+            These same modifications were made for all
+            sequence lengths.
+
         \item Parameter Count
             
-            The parameter count of the LSTM network was more
-            than triple that of the basic RNN network, and
-            the GRU was almost halfway between the two. This
-            is to be expected, as the LSTM adds significant
-            complexity to the base RNN architecture, and the
-            GRU reduces that complexity. This complexity
-            comes from the number of gates in each
-            architecture. 
+            The LSTM had more parameters than the GRU
+            because it is the more complex architecture.
+            However, when the models were adjusted to
+            improve their performance, the LSTM had fewer
+            parameters even after the additional layers
+            because the reduction of sequence length was
+            more significant for the LSTM. Additionally, the
+            GRU's dense layers are 4 and 2 times larger than
+            the LSTM's, respectively, which caused its
+            adjusted parameter count to be the highest of
+            the 4 models.
         \item Training Time
-        
-            The RNN was the quickest to train, followed by
-            the GRU and then the LSTM. Training time seemed
-            to increase linearly with sequence length for
-            all architectures.
-        \item Effect of Sequence Length
 
-            The sequence length of 10 was too short for the
-            models to have enough relevant information,
-            while the length of 30 was too difficult for the
-            models to learn. The sequence length of 20 was
-            the best compromise between the two. 
+            Sequence length did not have a significant
+            effect on training time. However, the GRU was
+            significantly faster to train than the LSTM.
+            Because the adjustments to the GRU model adds
+            complexity, it took longer to train than the
+            base model, whereas the adjusted LSTM model was
+            faster to train than the base model.
+            
+        \item Inference Time
+        
+            Average inference time was on the order of
+            nanoseconds for each model. This is likely due
+            to the small size of the models and the
+            simplicity of the task. The recorded data shows
+            fluctuations between the models, but these are
+            likely due to inaccuracies in recording
+            inference time when all samples in the batch are
+            computed in parallel.
 
         \item Overfitting
         

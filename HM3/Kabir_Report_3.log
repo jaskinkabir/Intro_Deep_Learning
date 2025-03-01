@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.11.14)  28 FEB 2025 22:07
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.11.14)  28 FEB 2025 22:31
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -477,51 +477,7 @@ l.107
       {/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
 
 [3]
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/LSTM-Adjusted-50_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/GRU-Adjusted-30_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
 /home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/GRU-Adjusted-50_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/LSTM-Adjusted-50_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/GRU-Adjusted-30_training_new.png' not found: using draft setting.
 
 See the pdftex.def package documentation for explanation.
 Type  H <return>  for immediate help.
@@ -563,21 +519,10 @@ File: images/LSTM-Adjusted-30_training_new.png Graphic file (type png)
 <use images/LSTM-Adjusted-30_training_new.png>
 Package pdftex.def Info: images/LSTM-Adjusted-30_training_new.png  used on input line 148.
 (pdftex.def)             Requested size: 114.0pt x 85.49576pt.
-
-LaTeX Warning: File `images/LSTM-Adjusted-50_training_new.png' not found on input line 148.
-
-
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/LSTM-Adjusted-50_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
+File: images/LSTM-Adjusted-50_training_new.png Graphic file (type png)
+<use images/LSTM-Adjusted-50_training_new.png>
+Package pdftex.def Info: images/LSTM-Adjusted-50_training_new.png  used on input line 148.
+(pdftex.def)             Requested size: 114.0pt x 85.49576pt.
 File: images/GRU-20_training_new.png Graphic file (type png)
 <use images/GRU-20_training_new.png>
 Package pdftex.def Info: images/GRU-20_training_new.png  used on input line 148.
@@ -594,21 +539,10 @@ File: images/GRU-Adjusted-20_training_new.png Graphic file (type png)
 <use images/GRU-Adjusted-20_training_new.png>
 Package pdftex.def Info: images/GRU-Adjusted-20_training_new.png  used on input line 148.
 (pdftex.def)             Requested size: 114.0pt x 85.49576pt.
-
-LaTeX Warning: File `images/GRU-Adjusted-30_training_new.png' not found on input line 148.
-
-
-/home/jaskin/Intro_Deep_Learning/HM3/Kabir_Report_3.tex:148: Package pdftex.def Error: File `images/GRU-Adjusted-30_training_new.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.148         \end{tabularx}
-                            
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
+File: images/GRU-Adjusted-30_training_new.png Graphic file (type png)
+<use images/GRU-Adjusted-30_training_new.png>
+Package pdftex.def Info: images/GRU-Adjusted-30_training_new.png  used on input line 148.
+(pdftex.def)             Requested size: 114.0pt x 85.49576pt.
 
 LaTeX Warning: File `images/GRU-Adjusted-50_training_new.png' not found on input line 148.
 
@@ -631,9 +565,14 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) has
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.152       \newpage
-                     <./images/LSTM-20_training_new.png> <./images/LSTM-30_training_new.png> <./images/LSTM-50_training_new.png> <./images/LSTM-Adjusted-20_training_new.png> <./images/LSTM-Adjusted-30_training_new.png> <./images/GRU-20_training_new.png> <./images/GRU-30_training_new.png> <./images/GRU-50_training_new.png> <./images/GRU-Adjusted-20_training_new.png>]
+                     <./images/LSTM-20_training_new.png> <./images/LSTM-30_training_new.png> <./images/LSTM-50_training_new.png> <./images/LSTM-Adjusted-20_training_new.png> <./images/LSTM-Adjusted-30_training_new.png> <./images/LSTM-Adjusted-50_training_new.png> <./images/GRU-20_training_new.png> <./images/GRU-30_training_new.png> <./images/GRU-50_training_new.png> <./images/GRU-Adjusted-20_training_new.png> <./images/GRU-Adjusted-30_training_new.png>]
 Overfull \hbox (241.94952pt too wide) in paragraph at lines 157--179
  [][] 
+ []
+
+
+Overfull \hbox (13.52837pt too wide) in paragraph at lines 184--195
+[]\OT1/cmr/m/n/10 Hyperparameter and Ar-chi-tec-ture Mod-i-fi-ca-tions To im-prove the LSTM's
  []
 
 
@@ -642,8 +581,8 @@ Overfull \hbox (241.94952pt too wide) in paragraph at lines 157--179
 pdfTeX warning (ext4): destination with the same identifier (name{table.2}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.207 
-      ]
+l.209         \item T
+                     raining Time]
 
 [6] (./Kabir_Report_3.aux)
  ***********
@@ -664,18 +603,18 @@ Package rerunfilecheck Info: Checksums for `Kabir_Report_3.out':
 (rerunfilecheck)             After:  B072679B46D893AF6C41B00712E3B1C9;553.
  ) 
 Here is how much of TeX's memory you used:
- 14709 strings out of 473362
- 287229 string characters out of 5720989
+ 14663 strings out of 473362
+ 284900 string characters out of 5720989
  802446 words of memory out of 5000000
- 37629 multiletter control sequences out of 15000+600000
+ 37583 multiletter control sequences out of 15000+600000
  564761 words of font info for 60 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  75i,15n,79p,410b,710s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb>
-Output written on Kabir_Report_3.pdf (7 pages, 679414 bytes).
+Output written on Kabir_Report_3.pdf (7 pages, 744903 bytes).
 PDF statistics:
- 139 PDF objects out of 1000 (max. 8388607)
+ 143 PDF objects out of 1000 (max. 8388607)
  75 compressed objects within 1 object stream
  19 named destinations out of 1000 (max. 500000)
- 91 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 101 words of extra memory for PDF output out of 10000 (max. 10000000)
 
