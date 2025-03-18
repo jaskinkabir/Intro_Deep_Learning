@@ -66,11 +66,11 @@ class EnglishToFrench(Dataset):
         seq = []
         for word in sentence.split():
             seq.append(language.word2index[word])
-        
-        if len(seq) < self.max_length-1:
-            seq += [PAD] * (self.max_length - len(seq) - 1)
-        
         seq.append(EOS)
+        if len(seq) < self.max_length:
+            seq += [PAD] * (self.max_length - len(seq))
+        
+        
         return seq
             
             

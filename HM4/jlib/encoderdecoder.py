@@ -92,7 +92,7 @@ class Translator(nn.Module):
         de_input = torch.tensor([[SOS]], device=device)
         de_hidden = en_hidden
         
-        predicted_indices = []
+        predicted_indices = torch.zeros_like(target_tensor)
         # decoder loop
         for di in range(target_length):
             de_output, de_hidden = self.decoder(de_input, de_hidden)
