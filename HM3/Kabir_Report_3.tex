@@ -42,7 +42,7 @@
     \begin{table}[h]
         \centering
         \renewcommand{\arraystretch}{1.5}
-        \begin{tabular}{|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
+        \begin{tabular}{|>{\centering\arraybackslash}m{2.5cm}|>{\centering\arraybackslash}m{2.5cm}|>{\centering\arraybackslash}m{2.5cm}|>{\centering\arraybackslash}m{2.5cm}|>{\centering\arraybackslash}m{2.5cm}|}
         %\begin{tabular}{|l|r|r|r|r|}
             \hline
             \textbf{Model} & \textbf{Parameter Count} & \textbf{Training Time (s)} & \textbf{Overfit (\%)} & \textbf{Accuracy (\%)} \\
@@ -153,32 +153,36 @@
     \item \textit{Results Comparison}
     \begin{table}[h]
         \centering
-        \renewcommand{\arraystretch}{1.5}
-        \begin{tabular}{|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|>{\centering\arraybackslash}m{3cm}|}
-        %\begin{tabular}{|l|r|r|r|r|}
+        \renewcommand{\arraystretch}{1.2} % Reduce row height
+        \setlength\tabcolsep{2pt} % Reduce column padding
+        \begin{tabular}{|>{\centering\arraybackslash}m{2.2cm}|>{\centering\arraybackslash}m{2cm}|>{\centering\arraybackslash}m{2cm}|>{\centering\arraybackslash}m{1.8cm}|>{\centering\arraybackslash}m{1.5cm}|>{\centering\arraybackslash}m{1.5cm}|}
             \hline
-            \textbf{Model} & \textbf{Parameter Count} & \textbf{Training Time (s)} & \textbf{Inference Time (s)} & \textbf{Overfit (\%)} & \textbf{Accuracy (\%)} \\
+            \textbf{Model} & \textbf{Param Count} & \textbf{Train Time (s)} & \textbf{Inf Time (ms)} & \textbf{Overfit (\%)} & \textbf{Acc (\%)} \\
             \hline
-            \textbf{LSTM-20}  & 148801   & 346.11  & 3.83  & 56.62 \\ %done
-            \textbf{LSTM-30}  & 44846  & 3.65  & 185.97  & 51.05 \\
-            \textbf{LSTM-50}  & 44846  & 5.24  & 235.41  & 48.31 \\
+            LSTM-20       & 148801  & 346.11  & 0.45  & 3.83  & 56.61 \\
+            LSTM-Adj-20   & 113093  & 339.66  & 2.02  & -1.96 & 57.29 \\
             \hline
-            \textbf{LSTM-Adjusted-20} & 143918 & 5.79  & 253.80  & 48.95 \\
-            \textbf{LSTM-Adjusted-30} & 143918 & 11.21 & 381.00  & 53.16 \\
-            \textbf{LSTM-Adjusted-50} & 143918 & 18.23 & 399.18  & 50.00 \\
+            GRU-20        & 115777  & 213.82  & 1.23  & 4.17  & 56.89 \\
+            GRU-Adj-20    & 176477  & 262.32  & 1.96  & -0.01 & 57.43 \\
             \hline
-            \textbf{GRU-20}  & 115777  & 5.30  & 329.01  & 51.89 \\
-            \textbf{GRU-30}  & 110894 & 9.88  & 347.95  & 54.01 \\
-            \textbf{GRU-50}  & 110894 & 15.41 & 460.00  & 50.85 \\
+            LSTM-30       & 148801  & 359.37  & 0.35  & 4.00  & 56.69 \\
+            LSTM-Adj-30   & 113093  & 333.88  & 1.35  & -1.75 & 57.05 \\
             \hline
-            \textbf{GRU-Adjusted-20}  & 110894 & 5.30  & 329.01  & 51.89 \\
-            \textbf{GRU-Adjusted-30}  & 110894 & 9.88  & 347.95  & 54.01 \\
-            \textbf{GRU-Adjusted-50}  & 110894 & 15.41 & 460.00  & 50.85 \\
+            GRU-30        & 115777  & 251.61  & 0.39  & 4.18  & 57.00 \\
+            GRU-Adj-30    & 176477  & 258.06  & 0.99  & -0.56 & 57.64 \\
+            \hline
+            LSTM-50       & 148801  & 351.51  & 0.42  & 4.10  & 56.83 \\
+            LSTM-Adj-50   & 113093  & 335.79  & 1.96  & -2.45 & 57.20 \\
+            \hline
+            GRU-50        & 115777  & 237.81  & 0.38  & 4.22  & 56.88 \\
+            GRU-Adj-50    & 176477  & 262.60  & 1.73  & 0.25  & 57.16 \\
             \hline
         \end{tabular}
         \caption{Problem 2 Data Comparison}
         \label{tab:p2}
     \end{table}
+    
+    
     \item \textit{Discussion} 
     \begin{itemize}
         \item Hyperparameter and Architecture Modifications
