@@ -36,5 +36,7 @@ translator.train_model(
     loss_fn = nn.NLLLoss(),
     optimizer=torch.optim.Adam,
     optimizer_kwargs={'lr': 1e-3},
-    min_accuracy=.95
+    min_accuracy=1,
+    sched_patience=100,
+    max_negative_diff_count=100
 )

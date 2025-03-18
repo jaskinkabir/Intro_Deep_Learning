@@ -99,15 +99,18 @@ class Translator(nn.Module):
             
             # Choose top word from output
             _, topi = de_output.topk(1)
-            predicted_indices.append(topi.item())
+            predicted_indices[di] = topi.item()
             de_input = topi.squeeze().detach()
             
             loss += self.loss_fn(de_output, target_tensor[di].unsqueeze(0))
 
             if de_input.item() == EOS:
                 break
-        if predicted_indices == target_tensor.tolist():
-            correct_prediction = True
+        correct_prediction = torch.equal(predicted_indices, target_tensor)
+        # print("target")
+        # print(target_tensor.tolist())
+        # print("predicted")
+        # print(predicted_indices.tolist())
         return loss, correct_prediction, predicted_indices
     
     def train_model(
