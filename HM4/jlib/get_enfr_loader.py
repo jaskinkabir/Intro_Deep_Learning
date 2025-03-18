@@ -5,61 +5,68 @@ import numpy as np
 import gc
 import time
 
+SOS = 0
+EOS = 1
+
+
+class Language:
+    def __init__(self, name):
+        self.name = name
+        self.word2index = {}
+        self.word2count = {}
+        self.index2word = {0 : '<SOS>', 1: "<EOS>"}
+        self.n_words = 3
+        self.max_sentence_length = 0
+        
+    def add_sentence(self, sentence):
+        split = sentence.split(' ')
+        if len(split) > self.max_sentence_length:
+            self.max_sentence_length = len(split)
+        for word in split:
+            self.add_word(word)
+            
+    def add_word(self, word):
+        if word not in self.word2index:
+            self.word2index[word] = self.n_words
+            self.word2count[word] = 1
+            self.index2word[self.n_words] = word
+            self.n_words += 1
+        else:
+            self.word2count[word] += 1
+
 # Load data (English to French)
 class EnglishToFrench(Dataset):
     
-    def __init__(self, en2fr, gpu=False):
+    def __init__(self, en2fr):
         self.sequences = []
         self.targets = []
-        self.en_words: set[str] = set()
-        self.fr_words: set[str] = set()
+        self.en = Language('English')
+        self.fr = Language('French')
         
-        for english, french in en2fr():
-            for word in english.split():
-                self.en_words.add(word)
-            for word in french.split():
-                self.fr_words.add(word)
-        
-        self.en_words = sorted(list(self.en_words))
-        self.fr_words = sorted(list(self.fr_words))
-        self.enfr_w2i = {w: i for i, w in enumerate(self.en_words, 1)}
-        self.enfr_i2w = {i: w for i, w in enumerate(self.en_words, 1)}
-        self.fren_w2i = {w: i for i, w in enumerate(self.fr_words, 1)}
-        self.fren_i2w = {i: w for i, w in enumerate(self.fr_words, 1)}
-        
-        self.enfr_w2i['<sos>'] = 0
-        self.enfr_i2w[0] = '<sos>'
-        self.enfr_w2i['<eos>'] = len(self.enfr_w2i)
-        self.enfr_i2w[len(self.enfr_i2w)] = '<eos>'
-        
-        self.fren_w2i['<sos>'] = 0
-        self.fren_i2w[0] = '<sos>'
-        self.fren_w2i['<eos>'] = len(self.fren_w2i)
-        self.fren_i2w[len(self.fren_i2w)] = '<eos>'
-        
-        for english, french in en2fr():
-            en_seq = [0]
-            for en_word in english.split():
-                en_seq.append(self.enfr_w2i[en_word])
-            en_seq.append(self.enfr_w2i['<eos>'])
+        for english, french in en2fr:
+            self.en.add_sentence(english)
+            self.fr.add_sentence(french)
+
+        for english, french in en2fr:
+            en_seq = self.sentence_to_sequence(english, self.en)
             self.sequences.append(en_seq)
             
-            fr_seq = [0]
-            for fr_word in french.split():
-                fr_seq.append(self.fren_w2i[fr_word])
-            fr_seq.append(self.fren_w2i['<eos>'])
+            fr_seq = self.sentence_to_sequence(french, self.fr)
             self.targets.append(fr_seq)
+        
+    def sentence_to_sequence(self, sentence, language):
+        seq = []
+        for word in sentence.split():
+            seq.append(language.word2index[word])
+        
+        seq.append(EOS)
+        return seq
             
-        self.sequences = torch.tensor(self.sequences, dtype=torch.long)
-        self.targets = torch.tensor(self.targets, dtype=torch.long)
-        if gpu:
-            self.sequences = self.sequences.cuda()
-            self.targets = self.targets.cuda()
             
     def __len__(self):
         return len(self.sequences)
     def __getitem__(self, idx):
-        return self.sequences[idx], self.targets[idx]
+        return torch.tensor(self.sequences[idx],dtype=torch.long), torch.tensor(self.targets[idx],dtype=torch.long)
 
 
 def gen_data_loader(

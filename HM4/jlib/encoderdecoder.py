@@ -6,95 +6,108 @@ from torch.amp import GradScaler, autocast
 from torchtnt.utils.data import CudaDataPrefetcher
 import time
 import matplotlib.pyplot as plt
+from .get_enfr_loader import get_enfr_loader, SOS, EOS
+from data import english_to_french
+
 
 device = 'cuda'
 
-class EncoderDecoder(nn.Module):
-    @classmethod
-    def compare_results(cls, results1, results2):
-        print('Comparing results:')
-        
-        for key, value in results1.items():
-            if isinstance(value, Number): print(f"{key} : {100*(value - results2[key]) / value:2f} %") 
-        
-    def __init__(self):
+
+
+class EncoderRNN(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout, n_layers=1):
         super().__init__()
-    
-    def get_results(self, Y_val=None, Y_pred=None):
-        if Y_val is None:
-            Y_val = self.last_val
-        if Y_pred is None:
-            Y_pred = self.last_pred
-            
-        if isinstance(Y_val, torch.Tensor):
-            Y_val = Y_val.cpu().detach().numpy()
-        if isinstance(Y_pred, torch.Tensor):
-            Y_pred = Y_pred.cpu().detach().numpy()
-        results = {
-            'accuracy': accuracy_score(Y_val, Y_pred),
-            'precision': precision_score(Y_val, Y_pred, average='weighted'),
-            'recall': recall_score(Y_val, Y_pred, average='weighted'),
-            'f1': f1_score(Y_val, Y_pred, average='weighted'),
-            'confusion_matrix': confusion_matrix(Y_val, Y_pred),
-            'classification_report': classification_report(Y_val, Y_pred)
-        }
-        self.last_results = results
-        return results
-    def print_results(self, results=None):
-        if results is None:
-            try: 
-                results = self.last_results
-            except:
-                results = self.get_results()
-        for key, value in results.items():
-            if key in ['confusion_matrix', 'classification_report']:
-                print(f'{key.capitalize()}:\n{value}')
-            else:
-                print(f'{key.capitalize()}: {value}')
-    def remove_zeros(self, array):
-        return [x for x in array if x != 0]
-    def plot_training(self, title: str):
-        loss_hist = self.train_loss_hist.cpu().detach().numpy()
-        loss_hist = self.remove_zeros(loss_hist)
-        
-        val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
-        val_loss_hist = self.remove_zeros(val_loss_hist)
-        validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
-        validation_accuracy_hist = self.remove_zeros(validation_accuracy_hist)
-        
-        fig, ax = plt.subplots(1,2, sharex=True)
-        fig.suptitle(title)
-        ax[0].set_title('Loss Over Epochs')
-        ax[0].set_xlabel('Epoch')
-        ax[0].set_ylabel('Loss')
-        ax[0].plot(loss_hist, label='Training Loss')
-        ax[0].plot(val_loss_hist, label='Validation Loss')
-        ax[0].legend()
-        
-        ax[1].set_title('Validation Accuracy')
-        ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('%')
-        ax[1].plot(validation_accuracy_hist)
-        return fig        
-        #plt.show()
-    def plot_confusion_matrix(self, title):
-        if not hasattr(self, 'last_results'):
-            self.get_results()
-        cm = self.last_results['confusion_matrix']
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot()
-        disp.ax_.set_title(title)
+        self.hidden_size = hidden_size
+        self.embed = nn.Embedding(input_size, hidden_size)
+        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True, batch_first=True)
     def forward(self, x):
-        return self.sequential(x)
-    def predict(self, x):
-        with torch.no_grad():
-            return self.forward(x).argmax(dim=1)
+        embedded = self.embed(x).view(1, 1, -1)
+        outputs, hidden = self.rnn(embedded)
+        return outputs, hidden
+    
+    def initHidden(self):
+        # Initializes hidden state
+        return (torch.zeros(1, 1, self.hidden_size, device=device),
+                torch.zeros(1, 1, self.hidden_size, device=device))
+class DecoderRNN(nn.Module):
+    def __init__(self, output_size, hidden_size, dropout, n_layers=1):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.embed = nn.Embedding(output_size, hidden_size)
+        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True, batch_first=True)
+        self.out = nn.Linear(hidden_size, output_size)
+        self.softmax = nn.LogSoftmax(dim=1)
+    def forward(self, x, hidden):
+        embedded = self.embed(x).view(1, 1, -1)
+        output, hidden = self.rnn(embedded, hidden)
+        output = self.softmax(self.out(output[0]))
+        return output, hidden
+        
+    def initHidden(self):
+        # Initializes hidden state
+        return (torch.zeros(1, 1, self.hidden_size, device=device),
+                torch.zeros(1, 1, self.hidden_size, device=device))
+
+class Translator(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        output_size,
+        hidden_size,
+        dropout_en,
+        n_layers_en=1,
+        dropout_de=0.1,
+        n_layers_de=1,
+        device='cuda'
+    ):
+        super().__init__()
+        self.encoder: EncoderRNN = EncoderRNN(input_size, hidden_size, dropout_en, n_layers_en).to(device)
+        self.decoder: DecoderRNN = DecoderRNN(output_size, hidden_size, dropout_de, n_layers_de).to(device)
+        self.device = device
+        self.input_size = input_size
+        self.output_size = output_size
+        self.hidden_size = hidden_size
+    def forward_pass(self, input_tensor: torch.tensor, target_tensor: torch.tensor) -> tuple[Number, bool, list]:
+        en_hidden = self.encoder.initHidden()
+        
+        self.en_optimizer.zero_grad()
+        self.de_optimizer.zero_grad()
+        
+        input_length = input_tensor.size(0)
+        target_length = target_tensor.size(0)
+        loss = 0
+        correct_prediction = False
+        
+        # encoder loop
+        for ei in range(input_length):
+            _, en_hidden = self.encoder(input_tensor[ei].unsqueeze(0), en_hidden)
+            
+        de_input = torch.tensor([[SOS]], device=device)
+        de_hidden = en_hidden
+        predicted_indices = []
+        # decoder loop
+        for di in range(target_length):
+            de_output, de_hidden = self.decoder(de_input, de_hidden)
+            
+            # Choose top word from output
+            _, topi = de_output.topk(1)
+            predicted_indices.append(topi.item())
+            de_input = topi.squeeze().detach()
+            
+            loss += self.loss_fn(de_output, target_tensor[di].unsqueeze(0))
+
+            if de_input.item() == EOS:
+                break
+        if predicted_indices == target_tensor.tolist():
+            correct_prediction = True
+        return loss, correct_prediction, predicted_indices
+    
     def train_model(
             self,
             epochs,
-            train_loader,
-            val_loader,
-            loss_fn=nn.CrossEntropyLoss(),
+            train_loader: CudaDataPrefetcher,
+            val_loader: CudaDataPrefetcher,
+            loss_fn=nn.NLLLoss(),
             optimizer=torch.optim.SGD,
             optimizer_args = [],
             optimizer_kwargs = {},
@@ -105,14 +118,13 @@ class EncoderDecoder(nn.Module):
             min_accuracy = 0.5,
             max_negative_diff_count = 6
         ):  
-            self.last_val = torch.tensor(val_loader.data_iterable.dataset.dataset.targets)
             scaler = GradScaler("cuda")
-            optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=sched_patience, factor=sched_factor)
+            en_optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
+            de_optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
+            en_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(en_optimizer, 'max', patience=sched_patience, factor=sched_factor)
+            de_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(de_optimizer, 'max', patience=sched_patience, factor=sched_factor)
             training_time = 0
-            self.train_loss_hist = torch.zeros(epochs, device=device)
-            self.val_loss_hist = torch.zeros(epochs, device=device)
-            self.accuracy_hist = torch.zeros(epochs, device=device)
+            self.train_loss_hist = torch.zeros(epochs)
             
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -121,11 +133,10 @@ class EncoderDecoder(nn.Module):
                 "Epoch": 0,
                 "Epoch Time (s)": 0,
                 "Training Loss": 0,
-                "Test Loss ": 0,
+                "Validation Loss ": 0,
                 "Overfit (%)": 0,
                 "Accuracy (%)": 0,
                 "Δ Accuracy (%)": 0,
-                "Avg Inference Time" : 0,
                 "GPU Memory (GiB)": 0
             }
 
@@ -147,14 +158,17 @@ class EncoderDecoder(nn.Module):
                 train_loss = 0
                 total_train_samples = 0
                 self.train()
+                self.encoder.train()
+                self.decoder.train()
                 for X_batch, Y_batch in train_loader:
                     batch_size = X_batch.size(0)
-                    optimizer.zero_grad(set_to_none=True)
+                    en_optimizer.zero_grad(set_to_none=True)
+                    de_optimizer.zero_grad(set_to_none=True)
                     with autocast("cuda"):
-                        Y_pred = self.forward(X_batch)
-                        loss = loss_fn(Y_pred, Y_batch) 
+                        loss, _, _ = self.forward_pass(X_batch, Y_batch)
                     scaler.scale(loss).backward()
-                    scaler.step(optimizer)
+                    scaler.step(en_optimizer)
+                    scaler.step(de_optimizer)
                     scaler.update()                   
 
                     train_loss += loss.item() * batch_size
@@ -235,29 +249,6 @@ class EncoderDecoder(nn.Module):
 
             print(f'\nTraining Time: {training_time} seconds\n')
             self.last_pred = torch.tensor(Y_pred_eval)
-           
-            
-class ConvParams:
-    def __init__(self, kernel, out_chan, stride=1, padding='same', in_chan=0,):
-        self.kernel: int = kernel
-        self.in_chan: int = in_chan
-        self.out_chan: int = out_chan
-        self.stride: int = stride
-        self.padding: str = padding
-    def __dict__(self):
-        return {
-            'kernel_size': self.kernel,
-            'in_channels': self.in_chan,
-            'out_channels': self.out_chan,
-            'stride': self.stride,
-            'padding': self.padding
-        }
-    def as_list(self):
-        return [
-            self.kernel,
-            self.out_chan,
-            self.stride,
-            self.padding,
-            self.in_chan
-        ]
+
+        
         
