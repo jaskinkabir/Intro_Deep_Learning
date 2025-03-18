@@ -19,34 +19,37 @@ class EncoderRNN(nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.embed = nn.Embedding(input_size, hidden_size)
-        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True, batch_first=True)
-    def forward(self, x):
+        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout)
+    def forward(self, x, hidden):
         embedded = self.embed(x).view(1, 1, -1)
-        outputs, hidden = self.rnn(embedded)
+        outputs, hidden = self.rnn(embedded, hidden)
         return outputs, hidden
     
     def initHidden(self):
         # Initializes hidden state
-        return (torch.zeros(1, 1, self.hidden_size, device=device),
-                torch.zeros(1, 1, self.hidden_size, device=device))
+        dummy_in = torch.zeros(1, 1, self.hidden_size, device=device)
+        _, hidden = self.rnn(dummy_in)
+        return torch.zeros_like(hidden, device=device)
 class DecoderRNN(nn.Module):
     def __init__(self, output_size, hidden_size, dropout, n_layers=1):
         super().__init__()
+        self.output_size = output_size
         self.hidden_size = hidden_size
         self.embed = nn.Embedding(output_size, hidden_size)
-        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True, batch_first=True)
+        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout)
         self.out = nn.Linear(hidden_size, output_size)
         self.softmax = nn.LogSoftmax(dim=1)
     def forward(self, x, hidden):
-        embedded = self.embed(x).view(1, 1, -1)
+        embedded = self.embed(x).view(1,1,-1)
         output, hidden = self.rnn(embedded, hidden)
         output = self.softmax(self.out(output[0]))
         return output, hidden
         
     def initHidden(self):
         # Initializes hidden state
-        return (torch.zeros(1, 1, self.hidden_size, device=device),
-                torch.zeros(1, 1, self.hidden_size, device=device))
+        dummy_in = torch.zeros(1, 1, self.hidden_size, device=device)
+        _, hidden = self.rnn(dummy_in)
+        return torch.zeros_like(hidden, device=device)
 
 class Translator(nn.Module):
     def __init__(
@@ -67,7 +70,10 @@ class Translator(nn.Module):
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
-    def forward_pass(self, input_tensor: torch.tensor, target_tensor: torch.tensor) -> tuple[Number, bool, list]:
+        self.loss_fn = nn.NLLLoss()
+        self.en_optimizer = torch.optim.Adam(self.encoder.parameters())
+        self.de_optimizer = torch.optim.Adam(self.decoder.parameters())
+    def forward_pass(self, input_tensor: torch.tensor, target_tensor: torch.tensor) -> tuple[torch.Tensor, bool, list]:
         en_hidden = self.encoder.initHidden()
         
         self.en_optimizer.zero_grad()
@@ -79,11 +85,13 @@ class Translator(nn.Module):
         correct_prediction = False
         
         # encoder loop
+        en_hidden = self.encoder.initHidden()
         for ei in range(input_length):
-            _, en_hidden = self.encoder(input_tensor[ei].unsqueeze(0), en_hidden)
+            _, en_hidden = self.encoder(input_tensor[ei], en_hidden)
             
         de_input = torch.tensor([[SOS]], device=device)
         de_hidden = en_hidden
+        
         predicted_indices = []
         # decoder loop
         for di in range(target_length):
@@ -125,6 +133,9 @@ class Translator(nn.Module):
             de_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(de_optimizer, 'max', patience=sched_patience, factor=sched_factor)
             training_time = 0
             self.train_loss_hist = torch.zeros(epochs)
+            self.val_loss_hist = torch.zeros(epochs)
+            self.accuracy_hist = torch.zeros(epochs)
+            self.loss_fn = loss_fn
             
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -134,9 +145,10 @@ class Translator(nn.Module):
                 "Epoch Time (s)": 0,
                 "Training Loss": 0,
                 "Validation Loss ": 0,
-                "Overfit (%)": 0,
+                "Validation Time": 0,
                 "Accuracy (%)": 0,
                 "Δ Accuracy (%)": 0,
+                "Avg Inference Time": 0,
                 "GPU Memory (GiB)": 0
             }
 
@@ -152,10 +164,11 @@ class Translator(nn.Module):
             negative_acc_diff_count = 0
             for epoch in range(epochs):
                 
-                begin_epoch = time.time()
-                start_time = time.time()
+                begin_epoch = time.perf_counter()
+                begin_train = time.perf_counter()
                 
-                train_loss = 0
+                
+                total_train_loss = 0
                 total_train_samples = 0
                 self.train()
                 self.encoder.train()
@@ -164,63 +177,63 @@ class Translator(nn.Module):
                     batch_size = X_batch.size(0)
                     en_optimizer.zero_grad(set_to_none=True)
                     de_optimizer.zero_grad(set_to_none=True)
+                    
                     with autocast("cuda"):
-                        loss, _, _ = self.forward_pass(X_batch, Y_batch)
-                    scaler.scale(loss).backward()
+                        losses = [loss for loss, _, _ in [self.forward_pass(X_batch[i], Y_batch[i]) for i in range(batch_size)]]
+                    
+                    train_batch_loss = sum(losses)
+                    scaler.scale(train_batch_loss).backward()
                     scaler.step(en_optimizer)
                     scaler.step(de_optimizer)
                     scaler.update()                   
 
-                    train_loss += loss.item() * batch_size
+                    total_train_loss += train_batch_loss.item() 
                     total_train_samples += batch_size
-                training_time += time.time() - start_time
+                training_time += time.perf_counter() - begin_train
                 
-                train_loss = train_loss/total_train_samples
-                self.train_loss_hist[epoch] = train_loss
+                total_train_loss = total_train_loss / X_batch.size(1) / total_train_samples
+                self.train_loss_hist[epoch] = total_train_loss
                 
-                del X_batch, Y_batch, loss, Y_pred
-                val_correct = 0
+                del X_batch, Y_batch, train_batch_loss
+                begin_val = time.perf_counter()
+                num_correct = 0
                 val_loss = 0
                 total_val_samples = 0
                 total_inference_time = 0
-                inference_count = 0
                 self.eval()
+                self.encoder.eval()
+                self.decoder.eval()
                 with torch.no_grad():
-                    Y_pred_eval = torch.zeros(len(val_loader.data_iterable.dataset)).to(device)
                     
-                    idx = 0
                     for X_val_batch, Y_val_batch in val_loader:
                         batch_size = X_val_batch.size(0)
                         with autocast('cuda'):
-                            inf_start = time.time()
-                            Y_pred_logits = self.forward(X_val_batch)
-                            total_inference_time += (time.time() - inf_start) / batch_size
-                            inference_count += 1
-                            batch_loss = loss_fn(Y_pred_logits, Y_val_batch) * batch_size
-                        val_loss += batch_loss.item()
-                        
-                        Y_pred = Y_pred_logits.argmax(dim=1)
-                        Y_pred_eval[idx:idx + batch_size] = Y_pred
-                        val_correct += (Y_pred == Y_val_batch).sum().item()
-                        idx += batch_size
-                        
-                        total_val_samples += batch_size
-                avg_inference_time = total_inference_time / inference_count
-                accuracy = val_correct/total_val_samples
-                val_loss = val_loss/total_val_samples
+                            val_batch_loss = 0
+                            for i in range(batch_size):
+                                begin_inf = time.perf_counter()
+                                val_sample_loss, correct, _ = self.forward_pass(X_val_batch[i], Y_val_batch[i])
+                                total_inference_time += (time.perf_counter() - begin_inf) 
+                                val_batch_loss += val_sample_loss
+                                num_correct += correct
+                                total_val_samples += 1
+                        val_loss += val_batch_loss.item()                        
+                    
+                avg_inference_time = total_inference_time / total_val_samples / X_val_batch.size(1)
+                accuracy = num_correct/total_val_samples
+                val_loss =val_loss / X_val_batch.size(1) / total_val_samples
                 self.val_loss_hist[epoch] = val_loss                   
                 self.accuracy_hist[epoch] = accuracy
-                del X_val_batch, Y_val_batch, Y_pred_logits, Y_pred
-                scheduler.step(accuracy)
+                en_scheduler.step(accuracy)
+                de_scheduler.step(accuracy)
                 
-                end_epoch = time.time()
+                end_epoch = time.perf_counter()
                 if print_epoch and (epoch % print_epoch == 0 or epoch == epochs - 1) :
                     mem = (torch.cuda.memory_allocated() + torch.cuda.memory_reserved())/1024**3
                     if header_epoch and epoch % header_epoch == 0:
                         print(header_string)
                         print(divider_string)
                     epoch_duration = end_epoch - begin_epoch
-                    overfit = 100 * (val_loss - train_loss) / train_loss
+                    overfit = 100 * (val_loss - total_train_loss) / total_train_loss
                     d_accuracy = 0 if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
                     if d_accuracy <= 0:
                         negative_acc_diff_count += 1
@@ -232,10 +245,10 @@ class Translator(nn.Module):
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
+                    epoch_inspection['Training Loss'] = f'{total_train_loss:8f}'
+                    epoch_inspection['Validation Loss '] = f'{val_loss:8f}'
                     epoch_inspection['Avg Inference Time'] = f'{avg_inference_time:4e}'
-                    epoch_inspection['Training Loss'] = f'{train_loss:8f}'
-                    epoch_inspection['Test Loss '] = f'{val_loss:8f}'
-                    epoch_inspection['Overfit (%)'] = f'{overfit:4f}'
+                    epoch_inspection["Validation Time"] = f'{end_epoch - begin_val:4f}'
                     epoch_inspection['Accuracy (%)'] = f'{accuracy*100:4f}'
                     epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy:4f}'
                     epoch_inspection["GPU Memory (GiB)"] = f'{mem:2f}'
@@ -248,7 +261,6 @@ class Translator(nn.Module):
                     break
 
             print(f'\nTraining Time: {training_time} seconds\n')
-            self.last_pred = torch.tensor(Y_pred_eval)
 
         
         
