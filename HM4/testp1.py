@@ -12,8 +12,8 @@ translator = Translator(
     input_size = en2fr.en.n_words,
     output_size = en2fr.fr.n_words,
     teacher_forcing_ratio=0.6,
-    hidden_size = 2048,
-    n_layers = 8,
+    hidden_size = 1024,
+    n_layers = 5,
     dropout = 0.5,
 )
 translator.load_state_dict(state_dict)
@@ -22,6 +22,7 @@ translator.to('cuda')
 translator.eval()
 while True:
     sentence = input('Enter a sentence: ')
+    sentence.lower()
     if sentence == 'exit':
         break
     try:
@@ -29,9 +30,9 @@ while True:
     except KeyError:
         print("Error: Unkown Input Word")
         continue
-    seq = torch.tensor(seq, dtype=torch.long).to('cuda')
+    seq = torch.tensor(seq, dtype=torch.long).to('cuda').unsqueeze(0)
     output = translator.forward(seq)
-    sentence = en2fr.fr.sequence_to_sentence(output.argmax(dim=1))
+    sentence = en2fr.fr.sequence_to_sentence(output.argmax(dim=-1).squeeze())
     print("Translation: ")
     print(sentence)
     print()

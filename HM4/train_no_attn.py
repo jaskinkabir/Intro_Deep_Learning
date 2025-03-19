@@ -29,7 +29,7 @@ translator = Translator(
 )
 
 translator.train_model(
-    epochs = 100,
+    epochs = 120,
     train_loader = train_loader,
     val_loader = val_loader,
     optimizer=torch.optim.Adam,

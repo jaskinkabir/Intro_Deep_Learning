@@ -22,7 +22,8 @@ class Language:
     def set_max_sentence_length(self, max_length: int) -> None:
         self.max_sentence_length = max_length
     
-    def add_sentence(self, sentence):
+    def add_sentence(self, sentence: str):
+        sentence.lower()
         split = sentence.split(' ')
         if len(split) > self.max_sentence_length:
             self.max_sentence_length = len(split)
@@ -30,6 +31,7 @@ class Language:
             self.add_word(word)
             
     def add_word(self, word: str) -> None:
+        word.lower()
         if word not in self.word2index:
             self.word2index[word] = self.n_words
             self.word2count[word] = 1
@@ -39,6 +41,7 @@ class Language:
             self.word2count[word] += 1
             
     def sentence_to_sequence(self, sentence: str) -> list[int]:
+        sentence.lower()
         seq = []
         for word in sentence.split():
             seq.append(self.word2index[word])
@@ -52,7 +55,7 @@ class Language:
     def sequence_to_sentence(self, sequence: torch.Tensor) -> str:
         sentence = []
         for i in sequence:
-            if i == EOS:
+            if i == EOS or i == PAD:
                 break
             sentence.append(self.index2word[i.item()])
         return ' '.join(sentence)
