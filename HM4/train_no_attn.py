@@ -22,25 +22,24 @@ val_loader = DataLoader(
 translator = Translator(
     input_size = en2fr.en.n_words,
     output_size = en2fr.fr.n_words,
-    hidden_size = 256,
-    n_layers_en = 2,
-    n_layers_de = 2,
-    dropout_de=0.1,
-    dropout_en=0.1,
+    teacher_forcing_ratio=0.5,
+    hidden_size = 1024,
+    n_layers = 5,
+    dropout = 0.5,
 )
 
 translator.train_model(
-    epochs = 35,
+    epochs = 100,
     train_loader = train_loader,
     val_loader = val_loader,
-    loss_fn = nn.NLLLoss(),
     optimizer=torch.optim.Adam,
-    optimizer_kwargs={'lr': 1e-3},
+    optimizer_kwargs={'lr': 1e-3, 'weight_decay': 1e-5},
     min_accuracy=1,
     sched_patience=100,
     max_negative_diff_count=100
 )
 
-translator.plot_training('English To French No Attn')
+fig = translator.plot_training('English To French No Attn')
+fig.savefig('plots/p1.png')
 
-torch.save(translator, 'models/p1.pth')
+torch.save(translator.state_dict(), 'models/p1.pth')

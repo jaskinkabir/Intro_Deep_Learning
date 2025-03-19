@@ -1,4 +1,5 @@
 import torch
+import torch.nn.utils.rnn as rnn_utils
 from torchtnt.utils.data import CudaDataPrefetcher
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
