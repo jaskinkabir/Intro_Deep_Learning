@@ -73,7 +73,7 @@ class Translator(nn.Module):
         self.loss_fn = nn.NLLLoss()
         self.en_optimizer = torch.optim.Adam(self.encoder.parameters())
         self.de_optimizer = torch.optim.Adam(self.decoder.parameters())
-    def forward_pass(self, input_tensor: torch.tensor, target_tensor: torch.tensor) -> tuple[torch.Tensor, bool, list]:
+    def forward_pass(self, input_tensor: torch.tensor, target_tensor: torch.tensor) -> tuple[torch.Tensor, bool, torch.Tensor]:
         en_hidden = self.encoder.initHidden()
         
         self.en_optimizer.zero_grad()
@@ -265,5 +265,29 @@ class Translator(nn.Module):
 
             print(f'\nTraining Time: {training_time} seconds\n')
 
+    def remove_zeros(self, array):
+        return [x for x in array if x != 0]
+    
+    def plot_training(self, title: str) -> plt.Figure:
+        loss_hist = self.train_loss_hist.cpu().detach().numpy()
+        loss_hist = self.remove_zeros(loss_hist)
         
+        val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
+        val_loss_hist = self.remove_zeros(val_loss_hist)
+        validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
+        validation_accuracy_hist = self.remove_zeros(validation_accuracy_hist)
         
+        fig, ax = plt.subplots(1,2, sharex=True)
+        fig.suptitle(title)
+        ax[0].set_title('Loss Over Epochs')
+        ax[0].set_xlabel('Epoch')
+        ax[0].set_ylabel('Loss')
+        ax[0].plot(loss_hist, label='Training Loss')
+        ax[0].plot(val_loss_hist, label='Validation Loss')
+        ax[0].legend()
+        
+        ax[1].set_title('Validation Accuracy')
+        ax[1].set_xlabel('Epoch')
+        ax[1].set_ylabel('%')
+        ax[1].plot(validation_accuracy_hist)
+        return fig        

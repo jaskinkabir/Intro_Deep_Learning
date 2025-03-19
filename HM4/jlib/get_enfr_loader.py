@@ -17,7 +17,10 @@ class Language:
         self.index2word = {0: "<PAD>", 1 : '<SOS>', 2: "<EOS>"}
         self.n_words = 3
         self.max_sentence_length = 0
-        
+    
+    def set_max_sentence_length(self, max_length: int) -> None:
+        self.max_sentence_length = max_length
+    
     def add_sentence(self, sentence):
         split = sentence.split(' ')
         if len(split) > self.max_sentence_length:
@@ -25,7 +28,7 @@ class Language:
         for word in split:
             self.add_word(word)
             
-    def add_word(self, word):
+    def add_word(self, word: str) -> None:
         if word not in self.word2index:
             self.word2index[word] = self.n_words
             self.word2count[word] = 1
@@ -33,6 +36,25 @@ class Language:
             self.n_words += 1
         else:
             self.word2count[word] += 1
+            
+    def sentence_to_sequence(self, sentence: str) -> list[int]:
+        seq = []
+        for word in sentence.split():
+            seq.append(self.word2index[word])
+        seq.append(EOS)
+        if len(seq) < self.max_sentence_length:
+            seq += [PAD] * (self.max_sentence_length - len(seq))
+        elif len(seq) > self.max_sentence_length:
+            seq = seq[:self.max_sentence_length]
+        return seq
+    
+    def sequence_to_sentence(self, sequence: torch.Tensor) -> str:
+        sentence = []
+        for i in sequence:
+            if i == EOS:
+                break
+            sentence.append(self.index2word[i.item()])
+        return ' '.join(sentence)
 
 # Load data (English to French)
 class EnglishToFrench(Dataset):
@@ -48,12 +70,14 @@ class EnglishToFrench(Dataset):
             self.fr.add_sentence(french)
         
         self.max_length = max(max_length, self.en.max_sentence_length, self.fr.max_sentence_length) + 2
+        self.en.set_max_sentence_length(self.max_length)
+        self.fr.set_max_sentence_length(self.max_length)
 
         for english, french in en2fr:
-            en_seq = self.sentence_to_sequence(english, self.en)
+            en_seq = self.en.sentence_to_sequence(english)
             self.sequences.append(en_seq)
             
-            fr_seq = self.sentence_to_sequence(french, self.fr)
+            fr_seq = self.fr.sentence_to_sequence(french)
             self.targets.append(fr_seq)
             
         self.sequences = torch.tensor(self.sequences, dtype=torch.long)
@@ -61,17 +85,6 @@ class EnglishToFrench(Dataset):
         if gpu:
             self.sequences = self.sequences.cuda()
             self.targets = self.targets.cuda()
-        
-    def sentence_to_sequence(self, sentence, language):
-        seq = []
-        for word in sentence.split():
-            seq.append(language.word2index[word])
-        seq.append(EOS)
-        if len(seq) < self.max_length:
-            seq += [PAD] * (self.max_length - len(seq))
-        
-        
-        return seq
             
             
     def __len__(self):

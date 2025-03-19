@@ -30,7 +30,7 @@ translator = Translator(
 )
 
 translator.train_model(
-    epochs = 50,
+    epochs = 35,
     train_loader = train_loader,
     val_loader = val_loader,
     loss_fn = nn.NLLLoss(),
@@ -40,3 +40,7 @@ translator.train_model(
     sched_patience=100,
     max_negative_diff_count=100
 )
+
+translator.plot_training('English To French No Attn')
+
+torch.save(translator, 'models/p1.pth')
