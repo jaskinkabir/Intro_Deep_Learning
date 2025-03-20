@@ -19,8 +19,10 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.embed = nn.Embedding(input_size, hidden_size)
         self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         embedded = self.embed(x)#.view(1, 1, -1)
+        embedded = self.dropout(embedded)
         outputs, hidden = self.rnn(embedded)
         return outputs, hidden
     
@@ -37,6 +39,7 @@ class DecoderRNN(nn.Module):
         self.max_sentence_length = max_sentence_length
         self.teacher_forcing_ratio = teacher_forcing_ratio
         self.embed = nn.Embedding(output_size, hidden_size)
+        self.dropout = nn.Dropout(dropout)
         self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
         self.out = nn.Linear(hidden_size, output_size)
 
@@ -61,7 +64,7 @@ class DecoderRNN(nn.Module):
     
     def forward_step(self, input_tensor: torch.Tensor, hidden: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         embedded = self.embed(input_tensor)
-        output = F.relu(embedded)
+        output = self.dropout(embedded)
         output, hidden = self.rnn(output, hidden)
         output: torch.Tensor = self.out(output)
         return output, hidden
@@ -75,11 +78,11 @@ class DecoderRNN(nn.Module):
 class BahdanauAttention(nn.Module):
     def __init__(self, hidden_size):
         super().__init__()
-        self.Wa = nn.Linear(hidden_size, hidden_size)
-        self.Ua = nn.Linear(hidden_size, hidden_size)
-        self.Va = nn.Linear(hidden_size, 1)
+        self.query_matrix = nn.Linear(hidden_size, hidden_size)
+        self.key_matrix = nn.Linear(hidden_size, hidden_size)
+        self.value_matrix = nn.Linear(hidden_size, 1)
     def forward(self, query, keys):
-        scores = self.Va(torch.tanh(self.Wa(query) + self.Ua(keys)))
+        scores = self.value_matrix(torch.tanh(self.query_matrix(query) + self.key_matrix(keys)))
         scores = scores.squeeze(2).unsqueeze(1)
         weights = F.softmax(scores, dim=-1)
         context = torch.bmm(weights, keys)
@@ -95,7 +98,8 @@ class AttnDecoderRNN(nn.Module):
         self.teacher_forcing_ratio = teacher_forcing_ratio
         self.embed = nn.Embedding(output_size, hidden_size)
         self.attention = BahdanauAttention(hidden_size)
-        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
+        self.rnn = nn.GRU(2*hidden_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
         self.out = nn.Linear(hidden_size, output_size)
         
     def forward(self, encoder_outputs: torch.Tensor, encoder_hidden: torch.Tensor, target_tensor: torch.Tensor = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -119,9 +123,10 @@ class AttnDecoderRNN(nn.Module):
     
     def forward_step(self, input: torch.Tensor, hidden: torch.Tensor, encoder_outputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         embedded = self.embed(input)
-        query = hidden.permute(1, 0, 2)
+        embedded = self.dropout(embedded)
+        query = hidden[-1].unsqueeze(1)  # Use the last layer's hidden state
         context, attention_weights = self.attention(query, encoder_outputs)
-        gru_in = torch.cat([embedded, context], dim=-1)
+        gru_in = torch.cat([embedded, context], dim=2)
         output, hidden = self.rnn(gru_in, hidden)
         output = self.out(output)
         return output, hidden, attention_weights

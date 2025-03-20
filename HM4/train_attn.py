@@ -25,19 +25,19 @@ translator = Translator(
     decoder=AttnDecoderRNN,
     teacher_forcing_ratio=0.5,
     hidden_size = 1024,
-    n_layers = 5,
+    n_layers = 1,
     dropout = 0.5,
 )
 
 translator.train_model(
-    epochs = 120,
+    epochs = 20,
     train_loader = train_loader,
     val_loader = val_loader,
     optimizer=torch.optim.Adam,
     optimizer_kwargs={'lr': 1e-3, 'weight_decay': 1e-5},
     min_accuracy=1,
     sched_patience=100,
-    max_negative_diff_count=20,
+    max_negative_diff_count=100,
     save_path='models/p2.pth'
 )
 
