@@ -2,7 +2,7 @@ from data import english_to_french
 import torch
 from torch import nn
 from jlib.get_enfr_loader import EnglishToFrench, Language, get_enfr_loader
-from jlib.encoderdecoder import Translator
+from jlib.encoderdecoder import Translator, AttnDecoderRNN
 from torch.utils.data import DataLoader
 
 
@@ -22,6 +22,7 @@ val_loader = DataLoader(
 translator = Translator(
     input_size = en2fr.en.n_words,
     output_size = en2fr.fr.n_words,
+    decoder=AttnDecoderRNN,
     teacher_forcing_ratio=0.5,
     hidden_size = 1024,
     n_layers = 5,
@@ -37,9 +38,9 @@ translator.train_model(
     min_accuracy=1,
     sched_patience=100,
     max_negative_diff_count=20,
-    save_path='models/p1.pth'
+    save_path='models/p2.pth'
 )
 
-fig = translator.plot_training('English To French No Attn')
-fig.savefig('plots/p1.png')
+fig = translator.plot_training('English To French With Attn')
+fig.savefig('plots/p2.png')
 

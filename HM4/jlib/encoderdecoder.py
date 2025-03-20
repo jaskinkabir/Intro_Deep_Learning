@@ -72,6 +72,60 @@ class DecoderRNN(nn.Module):
         _, hidden = self.rnn(dummy_in)
         return torch.zeros_like(hidden, device=device)
 
+class BahdanauAttention(nn.Module):
+    def __init__(self, hidden_size):
+        super().__init__()
+        self.Wa = nn.Linear(hidden_size, hidden_size)
+        self.Ua = nn.Linear(hidden_size, hidden_size)
+        self.Va = nn.Linear(hidden_size, 1)
+    def forward(self, query, keys):
+        scores = self.Va(torch.tanh(self.Wa(query) + self.Ua(keys)))
+        scores = scores.squeeze(2).unsqueeze(1)
+        weights = F.softmax(scores, dim=-1)
+        context = torch.bmm(weights, keys)
+        return context, weights
+        
+
+class AttnDecoderRNN(nn.Module):
+    def __init__(self, output_size, hidden_size, dropout, n_layers=1, max_sentence_length = 12, teacher_forcing_ratio = 0):
+        super().__init__()
+        self.output_size = output_size
+        self.hidden_size = hidden_size
+        self.max_sentence_length = max_sentence_length
+        self.teacher_forcing_ratio = teacher_forcing_ratio
+        self.embed = nn.Embedding(output_size, hidden_size)
+        self.attention = BahdanauAttention(hidden_size)
+        self.rnn = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
+        self.out = nn.Linear(hidden_size, output_size)
+        
+    def forward(self, encoder_outputs: torch.Tensor, encoder_hidden: torch.Tensor, target_tensor: torch.Tensor = None) -> tuple[torch.Tensor, torch.Tensor]:
+        batch_size = encoder_outputs.size(0)
+        decoder_input = torch.empty(batch_size, 1, dtype=torch.long, device=device).fill_(SOS)
+        decoder_hidden = encoder_hidden
+        decoder_outputs = torch.zeros(batch_size, self.max_sentence_length, self.output_size, device=device)
+        attentions = torch.zeros(batch_size, self.max_sentence_length, encoder_outputs.size(1), device=device)
+        
+        for i in range(self.max_sentence_length):
+            decoder_output, decoder_hidden, attention_weights = self.forward_step(decoder_input, decoder_hidden, encoder_outputs)
+            decoder_outputs[:, i] = decoder_output.squeeze()
+            attentions[:, i] = attention_weights.squeeze()
+            
+            if target_tensor is not None and random.random() < self.teacher_forcing_ratio:
+                decoder_input = target_tensor[:, i].unsqueeze(1)
+            else:
+                _ , topi = decoder_output.topk(1)
+                decoder_input = topi.squeeze(-1).detach()
+        return decoder_outputs, decoder_hidden, attentions
+    
+    def forward_step(self, input: torch.Tensor, hidden: torch.Tensor, encoder_outputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        embedded = self.embed(input)
+        query = hidden.permute(1, 0, 2)
+        context, attention_weights = self.attention(query, encoder_outputs)
+        gru_in = torch.cat([embedded, context], dim=-1)
+        output, hidden = self.rnn(gru_in, hidden)
+        output = self.out(output)
+        return output, hidden, attention_weights
+
 class Translator(nn.Module):
     def __init__(
         self,
@@ -82,13 +136,15 @@ class Translator(nn.Module):
         n_layers=1,
         teacher_forcing_ratio=0,
         max_sentence_length=12,
-        device='cuda'
+        device='cuda',
+        decoder = DecoderRNN,
+        decoder_kwargs = dict()
     ):
         super().__init__()
         self.n_layers = n_layers
         self.dropout = dropout
         self.encoder: EncoderRNN = EncoderRNN(input_size, hidden_size, dropout, n_layers).to(device)
-        self.decoder: DecoderRNN = DecoderRNN(output_size, hidden_size, dropout, n_layers, max_sentence_length, teacher_forcing_ratio).to(device)
+        self.decoder: DecoderRNN = decoder(output_size, hidden_size, dropout, n_layers, max_sentence_length, teacher_forcing_ratio, **decoder_kwargs).to(device)
         self.device = device
         self.input_size = input_size
         self.output_size = output_size
@@ -114,7 +170,8 @@ class Translator(nn.Module):
             sched_factor = 0.1,
             sched_patience = 5,
             min_accuracy = 0.5,
-            max_negative_diff_count = 6
+            max_negative_diff_count = 6,
+            save_path = None
         ):  
             scaler = GradScaler("cuda")
             self.en_optimizer = optimizer(self.encoder.parameters(), *optimizer_args, **optimizer_kwargs)
@@ -207,7 +264,7 @@ class Translator(nn.Module):
                 with torch.no_grad():
                     for X_val_batch, Y_val_batch in val_loader:
                         with autocast('cuda'):
-                            outputs = self.forward(X_val_batch, Y_val_batch)
+                            outputs = self.forward(X_val_batch)
                             val_batch_loss = self.loss_fn(
                                 outputs.view(-1, outputs.size(-1)),
                                 Y_val_batch.view(-1)
@@ -250,6 +307,8 @@ class Translator(nn.Module):
 
                     if accuracy > max_accuracy:
                         max_accuracy = accuracy
+                        if save_path:
+                            torch.save(self.state_dict(), save_path)
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'

@@ -20,6 +20,8 @@ translator.load_state_dict(state_dict)
 translator.decoder.teacher_forcing_ratio = 0
 translator.to('cuda')
 translator.eval()
+translator.decoder.eval()
+translator.encoder.eval()
 while True:
     sentence = input('Enter a sentence: ')
     sentence.lower()
