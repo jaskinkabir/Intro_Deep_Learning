@@ -250,7 +250,7 @@ class Translator(nn.Module):
                     epoch_train_loss += train_batch_loss.item() 
                 training_time += time.perf_counter() - begin_train
                 
-                epoch_train_loss = epoch_train_loss / len(train_loader.data_iterable)
+                epoch_train_loss = epoch_train_loss / len(train_loader)
                 self.train_loss_hist[epoch] = epoch_train_loss
                 
                 del X_batch, Y_batch, train_batch_loss
@@ -283,10 +283,10 @@ class Translator(nn.Module):
 
                         val_loss += val_batch_loss.item()                        
                 total_inference_time = time.perf_counter() - begin_val    
-                avg_inference_time = total_inference_time / len(val_loader.data_iterable)
+                avg_inference_time = total_inference_time / len(val_loader)
                 token_accuracy = num_correct_tokens / total_tokens
-                sentence_accuracy = num_correct_sentences / len(val_loader.data_iterable.dataset)
-                val_loss = val_loss / len(val_loader.data_iterable)
+                sentence_accuracy = num_correct_sentences / len(val_loader.dataset)
+                val_loss = val_loss / len(val_loader)
                 
                 accuracy = sentence_accuracy
                 self.val_loss_hist[epoch] = val_loss                   
