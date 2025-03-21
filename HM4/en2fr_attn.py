@@ -62,8 +62,8 @@ correct_sentences_encoded = translator.train_model(
 
 correct_sentences = [source_lang.sequence_to_sentence(seq) for seq in correct_sentences_encoded]
 
-fig = translator.plot_training('English To French No Attn')
-fig.savefig('plots/en2fr_attn.png')
+fig = translator.plot_training('English To French Attn')
+fig.savefig('latex/plots/en2fr_attn.png')
 
 params = sum(p.numel() for p in translator.parameters())
 # 18664726
