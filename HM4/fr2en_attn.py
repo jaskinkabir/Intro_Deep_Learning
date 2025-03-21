@@ -2,7 +2,7 @@ from data import english_to_french, english_to_french_qualitative
 import torch
 from torch import nn
 from jlib.get_enfr_loader import EnFrDataset, Language, get_enfr_loaders, genLangs
-from jlib.encoderdecoder import Translator
+from jlib.encoderdecoder import Translator, AttnDecoderRNN
 from torch.utils.data import DataLoader
 
 
@@ -22,6 +22,9 @@ val_set = EnFrDataset(
     target_lang=target_lang,
 )
 
+train_set.reverse()
+val_set.reverse()
+
 train_loader = DataLoader(
     train_set,
     batch_size=32,
@@ -38,6 +41,7 @@ val_loader = DataLoader(
 translator = Translator(
     input_size = train_set.source_lang.n_words,
     output_size = train_set.target_lang.n_words,
+    decoder = AttnDecoderRNN,
     teacher_forcing_ratio=0.6,
     hidden_size = 1024,
     max_sentence_length=12,
@@ -57,16 +61,16 @@ translator.train_model(
     min_accuracy=1,
     sched_patience=100,
     stop_on_plateau=False,
-    save_path='models/en2fr_noattn.pth'
+    save_path='models/fr2en_attn.pth'
 )
 
-fig = translator.plot_training('English To French No Attn')
-fig.savefig('plots/en2fr_noattn.png')
+fig = translator.plot_training('French To English With Attn')
+fig.savefig('plots/fr2en_attn.png')
 
 params = sum(p.numel() for p in translator.parameters())
 # 13418773
 
-#73% token
+#75% token
 #2% sentence
 # 15 second training
 print(f'The model has {params} parameters')

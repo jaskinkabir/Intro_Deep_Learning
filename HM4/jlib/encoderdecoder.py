@@ -166,6 +166,7 @@ class Translator(nn.Module):
             epochs,
             train_loader: CudaDataPrefetcher,
             val_loader: CudaDataPrefetcher,
+            stop_on_plateau = False,
             loss_fn=nn.CrossEntropyLoss(),
             optimizer=torch.optim.SGD,
             optimizer_args = [],
@@ -288,7 +289,7 @@ class Translator(nn.Module):
                 sentence_accuracy = num_correct_sentences / len(val_loader.dataset)
                 val_loss = val_loss / len(val_loader)
                 
-                accuracy = sentence_accuracy
+                accuracy = token_accuracy
                 self.val_loss_hist[epoch] = val_loss                   
                 self.accuracy_hist[epoch] = accuracy
                 self.en_scheduler.step(accuracy)
@@ -327,7 +328,7 @@ class Translator(nn.Module):
                     print('|')
                     print(divider_string)
                     
-                if accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count:
+                if stop_on_plateau and (accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count):
                     break
 
             print(f'\nTraining Time: {training_time} seconds\n')

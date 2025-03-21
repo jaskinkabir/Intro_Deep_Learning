@@ -2,19 +2,21 @@ from data import english_to_french
 import torch
 from torch import nn
 from jlib.get_enfr_loader import EnFrDataset, Language, get_enfr_loaders
-from jlib.encoderdecoder import Translator
+from jlib.encoderdecoder import Translator, AttnDecoderRNN
 from torch.utils.data import DataLoader
 
 en2fr = EnFrDataset(english_to_french, max_length=10, gpu=True)
 
-state_dict = torch.load('models/p1.pth')
+state_dict = torch.load('models/en2fr_attn.pth')
 translator = Translator(
     input_size = en2fr.source_lang.n_words,
     output_size = en2fr.target_lang.n_words,
+    decoder=AttnDecoderRNN,
     teacher_forcing_ratio=0.6,
     hidden_size = 1024,
-    n_layers = 5,
-    dropout = 0.5,
+    max_sentence_length=12,
+    n_layers = 1,
+    dropout = 0.8,
 )
 translator.load_state_dict(state_dict)
 translator.decoder.teacher_forcing_ratio = 0
