@@ -46,7 +46,7 @@ translator = Translator(
     dropout = 0.8,
 )
 
-translator.train_model(
+correct_sentences_encoded = translator.train_model(
     epochs = 100,
     header_epoch=10,
     train_loader = train_loader,
@@ -58,6 +58,9 @@ translator.train_model(
     stop_on_plateau=False,
     save_path='models/en2fr_attn.pth'
 )
+
+
+correct_sentences = [source_lang.sequence_to_sentence(seq) for seq in correct_sentences_encoded]
 
 fig = translator.plot_training('English To French No Attn')
 fig.savefig('plots/en2fr_attn.png')

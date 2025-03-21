@@ -216,7 +216,6 @@ english_to_french_qualitative = [
     ("The restaurant serves food", "Le restaurant sert une cuisine"),
     ("She studies mathematics", "Elle étudie les mathématiques"),
     ("We watch movies on Fridays together", "Nous regardons des films le vendredi ensemble"),
-    ("He listens to music while jogging", "Il écoute de la musique en faisant du jogging"),
     ("They travel around the world", "Ils voyagent autour du monde"),
     ("The table is in the library", "La table est à la bibliothèque"),
     ("He dances gracefully", "Il danse avec grâce"),

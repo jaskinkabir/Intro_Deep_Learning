@@ -5,7 +5,7 @@ from torch.amp import GradScaler, autocast
 from torchtnt.utils.data import CudaDataPrefetcher
 import time
 import matplotlib.pyplot as plt
-from .get_enfr_loader import SOS, EOS
+from .get_enfr_loader import SOS
 import random
 
 
@@ -179,6 +179,7 @@ class Translator(nn.Module):
             max_negative_diff_count = 6,
             save_path = None
         ):  
+            
             scaler = GradScaler("cuda")
             self.en_optimizer = optimizer(self.encoder.parameters(), *optimizer_args, **optimizer_kwargs)
             self.de_optimizer = optimizer(self.decoder.parameters(), *optimizer_args, **optimizer_kwargs)
@@ -221,7 +222,7 @@ class Translator(nn.Module):
             
             
             for epoch in range(epochs):
-                
+                all_correct_sentences = []
                 begin_epoch = time.perf_counter()
                 begin_train = time.perf_counter()
                 
@@ -279,6 +280,10 @@ class Translator(nn.Module):
                             num_correct_tokens += correct_predictions.sum().item()
                             total_tokens += Y_val_batch.numel()
                             correct_sentences = correct_predictions.all(dim=-1)
+                            all_correct_sentences.extend(
+                                X_val_batch[correct_sentences]
+                            )
+                            all_correct_sentences.append(correct_sentences)
                             num_correct_sentences += correct_sentences.sum().item()
                             
 
@@ -332,6 +337,7 @@ class Translator(nn.Module):
                     break
 
             print(f'\nTraining Time: {training_time} seconds\n')
+            return all_correct_sentences
 
     def remove_zeros(self, array):
         return [x for x in array if x != 0]

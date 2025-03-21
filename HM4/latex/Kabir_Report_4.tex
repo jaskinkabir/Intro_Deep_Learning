@@ -110,6 +110,29 @@ much more from attention, and this is reflected by this task
 showing twice the sentence level accuracy as the French to
 English translation task.
 
+While the attention models performed well, all models still
+suffered from overfiting in the form of complete
+memorization of the training data. This is reflected in the
+sentences that the best performing model, the English to
+French Translator with attention, produced. For example, the
+model correctly translated the sentences: "He cooks dinner"
+and "He sings a song" because these sentences are in the
+training data but with 'He' replaced with 'She'. The model
+can only correctly translate sentences that are very similar
+to those found in the training set. 
+
+This is a limitation of
+the encoder-decoder architecture. Even with Badhanau
+attention, the model only uses one head of attention, and
+has no mechanism to allow the output tokens to update each
+other with context information. Additionally, there is no
+positional encoding present in the model. These issues
+compound the model's inability to understand the contextual
+meaning of each word in the input sequence and the output
+sequence. Finally, the training dataset only contains around
+100 samples, which is not enough to train a model that can
+generalize well to unseen data.
+
 \begin{table}[h]
     \begin{tabular}{|c|c|c|c|}
         \hline
