@@ -140,7 +140,7 @@ class Translator(nn.Module):
         dropout,
         n_layers=1,
         teacher_forcing_ratio=0,
-        max_sentence_length=12,
+        max_sentence_length=14,
         device='cuda',
         decoder = DecoderRNN,
         decoder_kwargs = dict()
@@ -189,8 +189,6 @@ class Translator(nn.Module):
             self.accuracy_hist = torch.zeros(epochs)
             
             training_time = 0
-            
-            
             
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -252,7 +250,7 @@ class Translator(nn.Module):
                     epoch_train_loss += train_batch_loss.item() 
                 training_time += time.perf_counter() - begin_train
                 
-                epoch_train_loss = epoch_train_loss / len(train_loader)
+                epoch_train_loss = epoch_train_loss / len(train_loader.data_iterable)
                 self.train_loss_hist[epoch] = epoch_train_loss
                 
                 del X_batch, Y_batch, train_batch_loss
@@ -285,10 +283,10 @@ class Translator(nn.Module):
 
                         val_loss += val_batch_loss.item()                        
                 total_inference_time = time.perf_counter() - begin_val    
-                avg_inference_time = total_inference_time / len(val_loader)
+                avg_inference_time = total_inference_time / len(val_loader.data_iterable)
                 token_accuracy = num_correct_tokens / total_tokens
-                sentence_accuracy = num_correct_sentences / len(val_loader.dataset)
-                val_loss = val_loss / len(val_loader)
+                sentence_accuracy = num_correct_sentences / len(val_loader.data_iterable.dataset)
+                val_loss = val_loss / len(val_loader.data_iterable)
                 
                 accuracy = sentence_accuracy
                 self.val_loss_hist[epoch] = val_loss                   
@@ -321,7 +319,7 @@ class Translator(nn.Module):
                     epoch_inspection['Validation Loss '] = f'{val_loss:8f}'
                     epoch_inspection['Avg Inference Time'] = f'{avg_inference_time:4e}'
                     epoch_inspection["Validation Time"] = f'{end_epoch - begin_val:4f}'
-                    epoch_inspection['Sentence Accuracy'] = f'{accuracy*100:4f}'
+                    epoch_inspection['Sentence Accuracy'] = f'{sentence_accuracy*100:4f}'
                     epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy:4f}'
                     epoch_inspection["Token Accuracy"] = f'{token_accuracy*100:4f}'
                     for value in epoch_inspection.values():

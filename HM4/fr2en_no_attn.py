@@ -1,12 +1,16 @@
-from data import english_to_french
+from data import english_to_french, english_to_french_qualitative
 import torch
 from torch import nn
-from jlib.get_enfr_loader import EnglishToFrench, Language, get_enfr_loader
+from jlib.get_enfr_loader import EnFrDataset, Language, get_enfr_loaders
 from jlib.encoderdecoder import Translator
 from torch.utils.data import DataLoader
 
 
-en2fr = EnglishToFrench(english_to_french, max_length=10, gpu=True)
+en2fr = EnFrDataset(english_to_french, max_length=10, gpu=True)
+en2fr_val = EnFrDataset(english_to_french_qualitative, max_length=10, gpu=True)
+
+en2fr.reverse()
+en2fr_val.reverse()
 train_loader = DataLoader(
     en2fr,
     batch_size = 8,
@@ -14,17 +18,16 @@ train_loader = DataLoader(
 )
 
 val_loader = DataLoader(
-    en2fr,
+    en2fr_val,
     batch_size = 8,
     shuffle = True
 )
-
 translator = Translator(
-    input_size = en2fr.en.n_words,
-    output_size = en2fr.fr.n_words,
+    input_size = en2fr.target_lang.n_words,
+    output_size = en2fr.source_lang.n_words,
     teacher_forcing_ratio=0.5,
     hidden_size = 1024,
-    n_layers = 5,
+    n_layers = 1,
     dropout = 0.5,
 )
 
@@ -40,6 +43,6 @@ translator.train_model(
     save_path='models/p1.pth'
 )
 
-fig = translator.plot_training('English To French No Attn')
+fig = translator.plot_training('French To English No Attn')
 fig.savefig('plots/p1.png')
 
