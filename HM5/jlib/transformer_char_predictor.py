@@ -8,6 +8,8 @@ from torchtnt.utils.data import CudaDataPrefetcher
 import time
 import matplotlib.pyplot as plt
 
+from torch.jit import script
+
 
 class SequentialSkip(nn.Module):
     def __init__(self, sequential: nn.Sequential, dropout: int = 0):
@@ -79,7 +81,6 @@ class FeedForward(nn.Module):
             dropout=dropout
         )
         
-        
     def forward(self, x):
         return self.op(x)
         
@@ -140,6 +141,7 @@ class TransformerEncoder(nn.Module):
         max_len=5000,
         device = 'cuda'
     ):
+        super().__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.inner_dim = inner_dim
@@ -148,17 +150,17 @@ class TransformerEncoder(nn.Module):
         self.num_attn_layers = num_attn_layers
         self.device = device
         
-        super().__init__()
+        
         
         self.embedding = nn.Embedding(input_dim, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_len, device)
         self.encoder_layers = nn.Sequential(*[
-            _TransformerEncoderLayer(
+            torch.jit.script(_TransformerEncoderLayer(
                 hidden_dim,
                 inner_dim,
                 num_attn_heads,
                 dropout
-            )
+            ))
             for _ in range(num_attn_layers)
         ])
     def forward(self, sequences):
@@ -214,13 +216,14 @@ class TransformerCharPredictor(nn.Module):
         
         
         self.to(device)
-        
+
     def forward(self, x):
         x = self.encoder(x)
         x = self.head(x)
         return x
+    
     def predict(self, x):
-        return F.log_softmax(self.op(x), dim=-1)
+        return F.log_softmax(self.forward(x), dim=-1)
 
     
     def train_step(self, fetcher):
