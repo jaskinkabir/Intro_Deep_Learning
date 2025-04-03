@@ -117,7 +117,6 @@ class _TransformerEncoderLayer(nn.Module):
         self.feed_forward = FeedForward(hidden_dim, inner_dim, dropout=self.dropout)
         self.layer_norm1 = nn.LayerNorm(hidden_dim)
         self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        self.dropout = nn.Dropout(0.1)
         
     def forward(self, x):
         # Multi-head attention
@@ -222,6 +221,47 @@ class TransformerCharPredictor(nn.Module):
         return x
     def predict(self, x):
         return F.log_softmax(self.op(x), dim=-1)
+
+    
+    def train_step(self, fetcher):
+        epoch_train_loss = torch.zeros(1, device=self.device)
+        self.train()
+        
+        for X_batch, Y_batch in fetcher:
+            self.optimizer.zero_grad(set_to_none=True)
+                                
+            with autocast("cuda"):
+                outputs = self.forward(X_batch)
+                train_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_batch)
+            self.scaler.scale(train_batch_loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()                   
+
+            epoch_train_loss += train_batch_loss
+        return epoch_train_loss / len(fetcher.data_iterable)
+    
+    
+    def eval_step(self, fetcher):
+        num_correct_tokens = torch.zeros(1, device=self.device)
+        total_tokens = torch.zeros(1, device=self.device)
+        epoch_val_loss = torch.zeros(1, device=self.device)
+        self.eval()
+        with torch.no_grad():
+            for X_val_batch, Y_val_batch in fetcher:
+                with autocast('cuda'):
+                    outputs = self.forward(X_val_batch)
+                    val_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_val_batch)
+                    
+                    predicted_tokens = outputs.argmax(dim=-1)
+                    correct_predictions = (predicted_tokens == Y_val_batch)
+                    num_correct_tokens += correct_predictions.sum()
+                    total_tokens += Y_val_batch.numel()                            
+
+                epoch_val_loss += val_batch_loss                        
+        accuracy = num_correct_tokens / total_tokens
+        epoch_val_loss = epoch_val_loss / len(fetcher.data_iterable)        
+        return epoch_val_loss, accuracy
+    
     
 
     def train_model(
@@ -242,8 +282,10 @@ class TransformerCharPredictor(nn.Module):
             max_negative_diff_count = 6,
             save_path = None
         ):  
+        
+        
             train_start = time.perf_counter()
-            scaler = GradScaler("cuda")
+            self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', patience=sched_patience, factor=sched_factor)
             self.loss_fn = loss_fn
@@ -262,8 +304,6 @@ class TransformerCharPredictor(nn.Module):
                 "Validation Loss ": 0,
                 "Validation Accuracy": 0,
                 "Δ Accuracy (%)": 0,
-                "Validation Time": 0,
-                "Avg Inference Time": 0,
                 'Memory Usage' : 0,
             }
 
@@ -281,53 +321,16 @@ class TransformerCharPredictor(nn.Module):
             for epoch in range(epochs):
                 begin_epoch = time.perf_counter()             
                 
-                epoch_train_loss = 0
-                self.train()
                 
-                for X_batch, Y_batch in train_fetcher:
-                    self.optimizer.zero_grad(set_to_none=True)
-                                        
-                    with autocast("cuda"):
-                        outputs = self.forward(X_batch)
-                        train_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_batch)
-                    scaler.scale(train_batch_loss).backward()
-                    scaler.step(self.optimizer)
-                    scaler.update()                   
-
-                    epoch_train_loss += train_batch_loss.item() 
+                epoch_train_loss = self.train_step(train_fetcher)
                 
-                epoch_train_loss = epoch_train_loss / len(train_fetcher.data_iterable)
+                epoch_val_loss, accuracy = self.eval_step(val_fetcher)
+                
                 self.train_loss_hist[epoch] = epoch_train_loss
-                
-                del X_batch, Y_batch, train_batch_loss
-                
-                num_correct_tokens = 0
-                total_tokens = 0
-                epoch_val_loss = 0
-                total_inference_time = 0
-                self.eval()
-                begin_val = time.perf_counter()
-                with torch.no_grad():
-                    for X_val_batch, Y_val_batch in val_fetcher:
-                        with autocast('cuda'):
-                            outputs = self.forward(X_val_batch)
-                            val_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_val_batch)
-                            
-                            predicted_tokens = outputs.argmax(dim=-1)
-                            correct_predictions = (predicted_tokens == Y_val_batch)
-                            num_correct_tokens += correct_predictions.sum().item()
-                            total_tokens += Y_val_batch.numel()                            
-
-                        epoch_val_loss += val_batch_loss.item()                        
-                total_inference_time = time.perf_counter() - begin_val    
-                avg_inference_time = total_inference_time / len(val_fetcher.data_iterable)
-                accuracy = num_correct_tokens / total_tokens
-                epoch_val_loss = epoch_val_loss / len(val_fetcher.data_iterable)
-                
-                
-                self.val_loss_hist[epoch] = epoch_val_loss                   
+                self.val_loss_hist[epoch] = epoch_val_loss
                 self.accuracy_hist[epoch] = accuracy
                 self.scheduler.step(accuracy)
+                
                 
                 end_epoch = time.perf_counter()
                 if print_epoch and (epoch % print_epoch == 0 or epoch == epochs - 1) :
@@ -337,7 +340,7 @@ class TransformerCharPredictor(nn.Module):
                         print(divider_string)
                     epoch_duration = end_epoch - begin_epoch
                     
-                    d_accuracy = 0 if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
+                    d_accuracy = torch.zeros(1) if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
                     if d_accuracy <= 0:
                         negative_acc_diff_count += 1
                     else:
@@ -350,13 +353,11 @@ class TransformerCharPredictor(nn.Module):
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
-                    epoch_inspection['Training Loss'] = f'{epoch_train_loss:8f}'
-                    epoch_inspection['Validation Loss '] = f'{epoch_val_loss:8f}'
-                    epoch_inspection['Validation Accuracy'] = f'{accuracy*100:4f}'
+                    epoch_inspection['Training Loss'] = f'{epoch_train_loss.item():8f}'
+                    epoch_inspection['Validation Loss '] = f'{epoch_val_loss.item():8f}'
+                    epoch_inspection['Validation Accuracy'] = f'{accuracy.item()*100:4f}'
                     epoch_inspection['Memory Usage'] = f'{mem:4f}'
-                    epoch_inspection['Avg Inference Time'] = f'{avg_inference_time:4e}'
-                    epoch_inspection["Validation Time"] = f'{end_epoch - begin_val:4f}'
-                    epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy:4f}'
+                    epoch_inspection['Δ Accuracy (%)'] = f'{d_accuracy.item():4f}'
                     for value in epoch_inspection.values():
                         print(f"|{value:^{cell_width}}", end='')
                     print('|')
@@ -366,7 +367,7 @@ class TransformerCharPredictor(nn.Module):
                     break
 
             print(f'\nTraining Time: {(time.perf_counter() - train_start)*1000:4f} seconds\n')
-            print(f'Max Accuracy: {max_accuracy*100:4f}')
+            print(f'Max Accuracy: {max_accuracy.item()*100:4f}')
 
     def remove_zeros(self, array):
         return [x for x in array if x != 0]

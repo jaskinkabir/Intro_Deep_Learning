@@ -39,10 +39,10 @@ model = TransformerCharPredictor(
     num_attn_heads = 2,
     num_attn_layers=2,
     cls_head_dims=[512, 256, 128],
-    dropout = 0.2
+    dropout = 0.6
 )
 
-model.train_model(
+torch.jit.trace(model.train_model(
     epochs=10,
     train_fetcher=train_fetcher,
     val_fetcher=val_fetcher,
@@ -54,6 +54,6 @@ model.train_model(
     min_accuracy=1,
     max_negative_diff_count=100,
     save_path='models/p1-10.pth'
-)
+))
 
 model.plot_training('Small Corpus, Sequence Length 10')
