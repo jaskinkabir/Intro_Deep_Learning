@@ -50,7 +50,7 @@ def get_text(path, redownload=True):
             text = f.read()
     return text
 
-def gen_datasets(sequence_length, text):    
+def gen_datasets(text, sequence_length):    
     """
     Generates datasets for character-level text modeling tasks.
     Args:
@@ -71,10 +71,10 @@ def gen_datasets(sequence_length, text):
     sequences = []
     targets = []
     for i in range(0, len(encoded_text) - sequence_length):
-        seq = encoded_text[i:i+sequence_length]
-        target = encoded_text[i+sequence_length]
-        sequences.append(seq)
-        targets.append(target)
+        sequence = encoded_text[i:i + sequence_length]
+        label_sequence = encoded_text[i+1:i + sequence_length + 1]
+        sequences.append(sequence)
+        targets.append(label_sequence) 
 
     # Convert lists to PyTorch tensors
     sequences = torch.tensor(sequences, dtype=torch.long)

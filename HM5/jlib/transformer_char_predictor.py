@@ -1,8 +1,7 @@
-from transformer_components import TransformerEncoder, ClassifierHead
 import torch
 import torch.nn as nn
+import numpy as np
 import torch.nn.functional as F
-from torch.optim import Adam, Optimizer
 import time
 from torch.amp import GradScaler, autocast
 from torchtnt.utils.data import CudaDataPrefetcher
@@ -10,12 +9,172 @@ import time
 import matplotlib.pyplot as plt
 
 
+class SequentialSkip(nn.Module):
+    def __init__(self, sequential: nn.Sequential, dropout: int = 0):
+        super().__init__()
+        self.sequential = sequential
+        self.dropout = dropout
+        self.dropout_layer = nn.Dropout(dropout)
+        
+    def forward(self, x):
+        residual = x
+        x = self.sequential(x)
+        x = self.dropout_layer(x)
+        x = x + residual
+        return x
+
+class ClassifierHead(nn.Module):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        layer_dims,
+        dropout = 0,
+    ):
+        super().__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.layer_dims = layer_dims
+        self.dropout = dropout
+        
+        layer_dims = [in_dim] + layer_dims + [out_dim]
+        
+        layers = []
+        for i in range(1, len(layer_dims)):
+            linear_in = layer_dims[i-1]
+            linear_out = layer_dims[i]
+            layers.append(self._get_linear_layer(linear_in, linear_out))
+        self.layers = nn.Sequential(*layers)
+    def forward(self, x):
+        return self.layers(x)
+        
+    
+    def _get_linear_layer(self, in_dim, out_dim):
+            return nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+                nn.ReLU(),
+                nn.Dropout(self.dropout),
+            )
+            
+
+
+class FeedForward(nn.Module):
+    def __init__(
+        self,
+        hidden_dim,
+        inner_dim,
+        dropout = 0,      
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.inner_dim = inner_dim
+        self.dropout = dropout
+    
+        self.op = SequentialSkip(
+            nn.Sequential(
+                nn.Linear(hidden_dim, inner_dim),
+                nn.ReLU(),
+                nn.Linear(inner_dim, hidden_dim)
+            ),
+            dropout=dropout
+        )
+        
+        
+    def forward(self, x):
+        return self.op(x)
+        
+
+# Positional Encoding
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000, device='cuda'):
+        super(PositionalEncoding, self).__init__()
+        self.encoding = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
+        self.encoding[:, 0::2] = torch.sin(position * div_term)
+        self.encoding[:, 1::2] = torch.cos(position * div_term)
+        self.encoding = self.encoding.unsqueeze(0).to(device)
+
+    def forward(self, x):
+        return x + self.encoding[:, :x.size(1)]
+
+class _TransformerEncoderLayer(nn.Module):
+    def __init__(
+        self,
+        hidden_dim,
+        inner_dim,
+        num_heads,       
+        dropout = 0
+    ):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.inner_dim = inner_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+        
+        
+        self.attention = nn.MultiheadAttention(hidden_dim, num_heads)
+        self.feed_forward = FeedForward(hidden_dim, inner_dim, dropout=self.dropout)
+        self.layer_norm1 = nn.LayerNorm(hidden_dim)
+        self.layer_norm2 = nn.LayerNorm(hidden_dim)
+        self.dropout = nn.Dropout(0.1)
+        
+    def forward(self, x):
+        # Multi-head attention
+        attn_output, _ = self.attention.forward(x, x, x)
+        x = self.layer_norm1(x + attn_output)
+        
+        # Feed forward network
+        ff_output = self.feed_forward(x)
+        x = self.layer_norm2(x + ff_output)
+        
+        return x
+class TransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim,
+        inner_dim,
+        num_attn_heads,
+        num_attn_layers,
+        dropout=0,
+        max_len=5000,
+        device = 'cuda'
+    ):
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.inner_dim = inner_dim
+        self.num_attn_heads = num_attn_heads
+        self.dropout = dropout
+        self.num_attn_layers = num_attn_layers
+        self.device = device
+        
+        super().__init__()
+        
+        self.embedding = nn.Embedding(input_dim, hidden_dim)
+        self.positional_encoding = PositionalEncoding(hidden_dim, max_len, device)
+        self.encoder_layers = nn.Sequential(*[
+            _TransformerEncoderLayer(
+                hidden_dim,
+                inner_dim,
+                num_attn_heads,
+                dropout
+            )
+            for _ in range(num_attn_layers)
+        ])
+    def forward(self, sequences):
+        # sequences = sequences.to(self.device)
+        x = self.embedding(sequences)
+        x = self.positional_encoding(x)
+        
+        x = self.encoder_layers(x)
+        
+        return x
 
 class TransformerCharPredictor(nn.Module):
     def __init__(
         self,
-        input_size: int,
-        output_size: int,
+        alphabet_size: int,
         hidden_dim: int,
         inner_dim: int,
         num_attn_heads: int,
@@ -26,8 +185,7 @@ class TransformerCharPredictor(nn.Module):
         device: str = 'cuda'        
     ):
         super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
+        self.alphabet_size = alphabet_size
         self.hidden_dim = hidden_dim
         self.inner_dim = inner_dim
         self.num_attn_heads = num_attn_heads
@@ -37,28 +195,31 @@ class TransformerCharPredictor(nn.Module):
         self.max_len = max_len
         self.device = device
         
-        self.op = nn.Sequential(
-            TransformerEncoder(
-                input_dim=input_size,
-                hidden_dim=hidden_dim,
-                inner_dim=inner_dim,
-                num_attn_heads=num_attn_heads,
-                dropout=dropout,
-                num_attn_layers=num_attn_layers,
-                max_len=max_len,
-            ),
-            ClassifierHead(
-                in_dim=hidden_dim,
-                out_dim=output_size,
-                layer_dims=cls_head_dims,
-                dropout=dropout
-            )
+        
+        self.encoder = TransformerEncoder(
+            input_dim=alphabet_size,
+            hidden_dim=hidden_dim,
+            inner_dim=inner_dim,
+            num_attn_heads=num_attn_heads,
+            dropout=dropout,
+            num_attn_layers=num_attn_layers,
+            max_len=max_len,
+            device = device
         )
+        self.head = ClassifierHead(
+            in_dim=hidden_dim,
+            out_dim=alphabet_size,
+            layer_dims=cls_head_dims,
+            dropout=dropout
+        )
+        
         
         self.to(device)
         
     def forward(self, x):
-        return self.op(x)
+        x = self.encoder(x)
+        x = self.head(x)
+        return x
     def predict(self, x):
         return F.log_softmax(self.op(x), dim=-1)
     
@@ -66,8 +227,8 @@ class TransformerCharPredictor(nn.Module):
     def train_model(
             self,
             epochs,
-            train_loader: CudaDataPrefetcher,
-            val_loader: CudaDataPrefetcher,
+            train_fetcher: CudaDataPrefetcher,
+            val_fetcher: CudaDataPrefetcher,
             stop_on_plateau = False,
             loss_fn=nn.CrossEntropyLoss(),
             optimizer=torch.optim.SGD,
@@ -83,7 +244,7 @@ class TransformerCharPredictor(nn.Module):
         ):  
             train_start = time.perf_counter()
             scaler = GradScaler("cuda")
-            self.optimizer = optimizer(self.encoder.parameters(), *optimizer_args, **optimizer_kwargs)
+            self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', patience=sched_patience, factor=sched_factor)
             self.loss_fn = loss_fn
             self.train_loss_hist = torch.zeros(epochs)
@@ -123,11 +284,11 @@ class TransformerCharPredictor(nn.Module):
                 epoch_train_loss = 0
                 self.train()
                 
-                for X_batch, Y_batch in train_loader:
+                for X_batch, Y_batch in train_fetcher:
                     self.optimizer.zero_grad(set_to_none=True)
                                         
                     with autocast("cuda"):
-                        outputs = self.forward(X_batch, Y_batch)
+                        outputs = self.forward(X_batch)
                         train_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_batch)
                     scaler.scale(train_batch_loss).backward()
                     scaler.step(self.optimizer)
@@ -135,7 +296,7 @@ class TransformerCharPredictor(nn.Module):
 
                     epoch_train_loss += train_batch_loss.item() 
                 
-                epoch_train_loss = epoch_train_loss / len(train_loader)
+                epoch_train_loss = epoch_train_loss / len(train_fetcher.data_iterable)
                 self.train_loss_hist[epoch] = epoch_train_loss
                 
                 del X_batch, Y_batch, train_batch_loss
@@ -147,10 +308,10 @@ class TransformerCharPredictor(nn.Module):
                 self.eval()
                 begin_val = time.perf_counter()
                 with torch.no_grad():
-                    for X_val_batch, Y_val_batch in val_loader:
+                    for X_val_batch, Y_val_batch in val_fetcher:
                         with autocast('cuda'):
                             outputs = self.forward(X_val_batch)
-                            val_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_batch)
+                            val_batch_loss = self.loss_fn(outputs.transpose(1, 2), Y_val_batch)
                             
                             predicted_tokens = outputs.argmax(dim=-1)
                             correct_predictions = (predicted_tokens == Y_val_batch)
@@ -159,9 +320,9 @@ class TransformerCharPredictor(nn.Module):
 
                         epoch_val_loss += val_batch_loss.item()                        
                 total_inference_time = time.perf_counter() - begin_val    
-                avg_inference_time = total_inference_time / len(val_loader)
+                avg_inference_time = total_inference_time / len(val_fetcher.data_iterable)
                 accuracy = num_correct_tokens / total_tokens
-                epoch_val_loss = epoch_val_loss / len(val_loader)
+                epoch_val_loss = epoch_val_loss / len(val_fetcher.data_iterable)
                 
                 
                 self.val_loss_hist[epoch] = epoch_val_loss                   
