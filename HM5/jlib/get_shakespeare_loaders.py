@@ -6,6 +6,26 @@ import numpy as np
 import requests
 import gc
 
+
+class Alphabet():
+    def __init__(self, text):
+        self.chars = sorted(list(set(text)))
+        
+        self.char_to_int = {}
+        self.int_to_char = {}
+        for i, ch in enumerate(self.chars):
+            self.char_to_int[ch] = i
+            self.int_to_char[i] = ch        
+        
+    def __len__(self):
+        return len(self.chars)
+    
+    def encode(self, text):
+        return [self.char_to_int[ch] for ch in text]
+    def decode(self, encoded_text):
+        return ''.join([self.int_to_char[i] for i in encoded_text])
+        
+
 class CharDataset(Dataset):
     def __init__(self, sequences, targets):
         self.sequences = sequences
@@ -30,16 +50,22 @@ def get_text(path, redownload=True):
             text = f.read()
     return text
 
-def gen_datasets(sequence_length, redownload=False):
-    text = get_text(f'data/shakespeare.txt', redownload)
-# Step 2: Prepare the dataset
-    # Create a character mapping to integers
-    chars = sorted(list(set(text)))
-    char_to_int = {ch: i for i, ch in enumerate(chars)}
-    int_to_char = {i: ch for i, ch in enumerate(chars)}
-
-    # Encode the text into integers
-    encoded_text = [char_to_int[ch] for ch in text]
+def gen_datasets(sequence_length, text):    
+    """
+    Generates datasets for character-level text modeling tasks.
+    Args:
+        sequence_length (int): Length of the sequences to be generated.
+        text (str): The input text data.
+    Returns:
+        dict: A dictionary containing the following keys:
+            - 'alphabet': An Alphabet object containing character mappings.
+            - 'train_dataset': A PyTorch Dataset object for training data.
+            - 'val_dataset': A PyTorch Dataset object for validation data.
+    """
+    
+    
+    alphabet = Alphabet(text)
+    encoded_text = alphabet.encode(text)
 
     # Create sequences and targets
     sequences = []
@@ -63,15 +89,13 @@ def gen_datasets(sequence_length, redownload=False):
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
     return {
-        "chars" : chars,
-        "char_to_int" : char_to_int,
-        "int_to_char" : int_to_char,
+        'alphabet' : alphabet,
         "train_dataset" : train_dataset,
         "val_dataset" : val_dataset,
     }
 
 def gen_data_loader(
-    data,
+    dataset,
     batch_size = 8192,
     workers = 6,
     cpu_prefetch = 10,
@@ -87,7 +111,7 @@ def gen_data_loader(
 
     print('Begin init data loader')
     loader = DataLoader(
-        data,
+        dataset,
         batch_size=batch_size,
         num_workers=workers,
         prefetch_factor=cpu_prefetch,
@@ -126,19 +150,17 @@ def get_shakespeare_loaders(
     """
     Returns a dictionary containing the following
     {
-        'chars' : list[str] - Alphabet
-        'char_to_int' : dict[str, int] - Character to integer mapping
-        'int_to_char' : dict[int, str] - Integer to character mapping
-        'train_dataset' : Dataset - Training dataset
-        'val_dataset' : Dataset - Validation dataset
-        'train_loader' : DataLoader - Training data loader
-        'val_loader' : DataLoader - Validation data loader
+        'train_loader': DataLoader for training data,
+        'val_loader': DataLoader for validation data,
+        'train_dataset': Dataset for training data,
+        'val_dataset': Dataset for validation data,
+        'alphabet': Alphabet object containing character mappings
     }
     """
     
     
-    
-    data = gen_datasets(sequence_length)
+    text = get_text("shakespeare.txt", redownload=redownload)
+    data = gen_datasets(sequence_length, text)
     train_dataset = data['train_dataset']
     val_dataset = data['val_dataset']
     
