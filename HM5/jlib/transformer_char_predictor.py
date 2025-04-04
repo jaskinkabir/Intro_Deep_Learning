@@ -155,12 +155,12 @@ class TransformerEncoder(nn.Module):
         self.embedding = nn.Embedding(input_dim, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_len, device)
         self.encoder_layers = nn.Sequential(*[
-            torch.jit.script(_TransformerEncoderLayer(
+            _TransformerEncoderLayer(
                 hidden_dim,
                 inner_dim,
                 num_attn_heads,
                 dropout
-            ))
+            )
             for _ in range(num_attn_layers)
         ])
     def forward(self, sequences):
