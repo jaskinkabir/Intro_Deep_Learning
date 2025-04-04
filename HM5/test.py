@@ -4,9 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-text = ""
-with open('data/sequence.txt', 'r') as f:
-    text = f.read()
+text = data_utils.get_text('data/shakespeare.txt', redownload=False)
 def train_and_plot(seqlen: int):
     data = data_utils.gen_datasets(text, seqlen)
     train_data = data['train_dataset']
@@ -15,7 +13,7 @@ def train_and_plot(seqlen: int):
 
     train_fetcher = data_utils.gen_data_loader(
         train_data,
-        batch_size=32,
+        batch_size=128,
         workers = 6,
         cpu_prefetch= 20,
         gpu_prefetch=20

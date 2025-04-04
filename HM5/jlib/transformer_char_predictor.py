@@ -226,13 +226,13 @@ class TransformerCharPredictor(nn.Module):
                 print(divider_string)
             max_accuracy = torch.zeros(1, device=self.device)            
             negative_acc_diff_count = 0           
-            
+            print("Begin Training")
             for epoch in range(epochs):
                 begin_epoch = time.perf_counter()             
                 
-                
+                #print('train step')
                 epoch_train_loss = self.train_step(train_fetcher)
-                
+                #print('val step')
                 epoch_val_loss, accuracy = self.eval_step(val_fetcher)
                 
                 self.train_loss_hist[epoch] = epoch_train_loss
