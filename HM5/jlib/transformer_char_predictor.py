@@ -34,8 +34,9 @@ class History:
         self.accuracy_hist = self.remove_zeros(self.accuracy_hist)
         
         self.max_accuracy = max(self.accuracy_hist)
-        self.min_val_loss = min(self.val_loss_hist)
-        self.min_train_loss = min(self.train_loss_hist)
+        maxacc_idx = self.accuracy_hist.index(self.max_accuracy)
+        self.min_val_loss = self.val_loss_hist[maxacc_idx]
+        self.min_train_loss = self.train_loss_hist[maxacc_idx]
         
     
     @classmethod
