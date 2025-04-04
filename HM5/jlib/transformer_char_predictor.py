@@ -10,6 +10,16 @@ import matplotlib.pyplot as plt
 
 from torch.jit import script
 
+from dataclasses import dataclass
+
+class History(dataclass):
+    train_loss_hist: torch.tensor
+    val_loss_hist: torch.tensor
+    accuracy_hist: torch.tensor
+    
+    
+    
+
 
 class SequentialSkip(nn.Module):
     def __init__(self, sequential: nn.Sequential, dropout: int = 0):
@@ -192,7 +202,7 @@ class TransformerCharPredictor(nn.Module):
             save_path = None
         ):  
         
-        
+            header_epoch = print_epoch * header_epoch
             train_start = time.perf_counter()
             self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
@@ -201,6 +211,7 @@ class TransformerCharPredictor(nn.Module):
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
             self.accuracy_hist = torch.zeros(epochs)
+            d_accuracy = torch.zeros(1)
             
             
             cell_width = 20
@@ -242,6 +253,18 @@ class TransformerCharPredictor(nn.Module):
                 
                 
                 end_epoch = time.perf_counter()
+                d_accuracy = 100 * (accuracy - max_accuracy) / max_accuracy
+                if d_accuracy <= 0:
+                    negative_acc_diff_count += 1
+                else:
+                    negative_acc_diff_count = 0
+
+                if accuracy > max_accuracy:
+                    max_accuracy = accuracy
+                    if save_path:
+                        torch.save(self.state_dict(), save_path)
+                if stop_on_plateau and (accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count):
+                    break
                 if print_epoch and (epoch % print_epoch == 0 or epoch == epochs - 1) :
                     mem = (torch.cuda.memory_allocated() + torch.cuda.memory_reserved())/1024**3
                     if header_epoch and epoch % header_epoch == 0:
@@ -249,16 +272,6 @@ class TransformerCharPredictor(nn.Module):
                         print(divider_string)
                     epoch_duration = end_epoch - begin_epoch
                     
-                    d_accuracy = torch.zeros(1) if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
-                    if d_accuracy <= 0:
-                        negative_acc_diff_count += 1
-                    else:
-                        negative_acc_diff_count = 0
-
-                    if accuracy > max_accuracy:
-                        max_accuracy = accuracy
-                        if save_path:
-                            torch.save(self.state_dict(), save_path)
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
@@ -272,10 +285,8 @@ class TransformerCharPredictor(nn.Module):
                     print('|')
                     print(divider_string)
                     
-                if stop_on_plateau and (accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count):
-                    break
 
-            print(f'\nTraining Time: {(time.perf_counter() - train_start)*1000:4f} seconds\n')
+            print(f'\nTraining Time: {(time.perf_counter() - train_start):4f} seconds\n')
             print(f'Max Accuracy: {max_accuracy.item()*100:4f}')
 
     def remove_zeros(self, array):

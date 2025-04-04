@@ -3,8 +3,10 @@ import jlib.data_utils as data_utils
 import torch
 import torch.nn as nn
 import numpy as np
+text = ""
+with open('data/sequence.txt', 'r') as f:
+    text = f.read()
 
-text = data_utils.get_text('data/shakespeare.txt', redownload=False)
 def train_and_plot(seqlen: int):
     data = data_utils.gen_datasets(text, seqlen)
     train_data = data['train_dataset']
@@ -13,7 +15,7 @@ def train_and_plot(seqlen: int):
 
     train_fetcher = data_utils.gen_data_loader(
         train_data,
-        batch_size=128,
+        batch_size=32,
         workers = 6,
         cpu_prefetch= 20,
         gpu_prefetch=20
@@ -32,23 +34,21 @@ def train_and_plot(seqlen: int):
     model = TransformerCharPredictor(
         alphabet_size = len(alphabet),
         max_len = seqlen,
-        hidden_dim = 1024,
+        hidden_dim = 2048,
         inner_dim = 2048,
-        num_attn_heads = 8,
-        num_attn_layers=6,
-        cls_head_dims=[],
+        num_attn_heads = 2,
+        num_attn_layers=3,
+        cls_head_dims=[256],
         dropout = 0.1
     )
 
     param_count = sum(p.numel() for p in model.parameters())
     print(f"Model parameter count: {param_count:,}")
 
-    # test_input = next(iter(train_fetcher))[0]
 
-    # print(f"Model MACs: {profile_macs(model, test_input):,}")
     
-#Model parameter count: 77,219,372
-#Model MACs: 49,602,887,704
+# Model parameter count: 1,790,380
+# Model MACs: 568,279,052
 
 
 
@@ -58,7 +58,7 @@ def train_and_plot(seqlen: int):
         val_fetcher=val_fetcher,
         optimizer = torch.optim.Adam,
         optimizer_kwargs={
-            'lr': 3e-3,
+            'lr': 3e-4,
             'betas': (0.9, 0.98),
             'eps': 1e-9,
             'weight_decay': 1e-5
@@ -66,11 +66,12 @@ def train_and_plot(seqlen: int):
         min_accuracy=1,
         max_negative_diff_count=10,
         save_path=f'models/p1-{seqlen}.pth',
-        stop_on_plateau=True
+        stop_on_plateau=True,
     )
 
-    model.plot_training(f'Small Corpus, Sequece Length {seqlen}')
-
-
-
+    fig = model.plot_training(f'Small Corpus, Sequence Length {seqlen}')
+    fig.savefig(f'latex/images/p1-{seqlen}.png')
+    
+    del train_fetcher, val_fetcher, train_data, val_data, data, model, alphabet
+    
 train_and_plot(20)

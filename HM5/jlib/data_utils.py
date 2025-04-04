@@ -70,7 +70,7 @@ def gen_datasets(text, sequence_length):
     # Create sequences and targets
     sequences = []
     targets = []
-    for i in range(0, len(encoded_text) - sequence_length):
+    for i in range(0, len(encoded_text) - sequence_length, sequence_length+1):
         sequence = encoded_text[i:i + sequence_length]
         label_sequence = encoded_text[i+1:i + sequence_length + 1]
         sequences.append(sequence)
