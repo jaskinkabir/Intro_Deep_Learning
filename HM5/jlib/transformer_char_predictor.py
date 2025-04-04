@@ -59,32 +59,6 @@ class ClassifierHead(nn.Module):
             )
             
 
-
-class FeedForward(nn.Module):
-    def __init__(
-        self,
-        hidden_dim,
-        inner_dim,
-        dropout = 0,      
-    ):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.dropout = dropout
-    
-        self.op = SequentialSkip(
-            nn.Sequential(
-                nn.Linear(hidden_dim, inner_dim),
-                nn.ReLU(),
-                nn.Linear(inner_dim, hidden_dim)
-            ),
-            dropout=dropout
-        )
-        
-    def forward(self, x):
-        return self.op(x)
-        
-
 # Positional Encoding
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000, device='cuda'):
@@ -98,79 +72,6 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         return x + self.encoding[:, :x.size(1)]
-
-class _TransformerEncoderLayer(nn.Module):
-    def __init__(
-        self,
-        hidden_dim,
-        inner_dim,
-        num_heads,       
-        dropout = 0
-    ):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
-        
-        
-        self.attention = nn.MultiheadAttention(hidden_dim, num_heads)
-        self.feed_forward = FeedForward(hidden_dim, inner_dim, dropout=self.dropout)
-        self.layer_norm1 = nn.LayerNorm(hidden_dim)
-        self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        
-    def forward(self, x):
-        # Multi-head attention
-        attn_output, _ = self.attention.forward(x, x, x)
-        x = self.layer_norm1(x + attn_output)
-        
-        # Feed forward network
-        ff_output = self.feed_forward(x)
-        x = self.layer_norm2(x + ff_output)
-        
-        return x
-class TransformerEncoder(nn.Module):
-    def __init__(
-        self,
-        input_dim,
-        hidden_dim,
-        inner_dim,
-        num_attn_heads,
-        num_attn_layers,
-        dropout=0,
-        max_len=5000,
-        device = 'cuda'
-    ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.num_attn_heads = num_attn_heads
-        self.dropout = dropout
-        self.num_attn_layers = num_attn_layers
-        self.device = device
-        
-        
-        
-        self.embedding = nn.Embedding(input_dim, hidden_dim)
-        self.positional_encoding = PositionalEncoding(hidden_dim, max_len, device)
-        self.encoder_layers = nn.Sequential(*[
-            _TransformerEncoderLayer(
-                hidden_dim,
-                inner_dim,
-                num_attn_heads,
-                dropout
-            )
-            for _ in range(num_attn_layers)
-        ])
-    def forward(self, sequences):
-        # sequences = sequences.to(self.device)
-        x = self.embedding(sequences)
-        x = self.positional_encoding(x)
-        
-        x = self.encoder_layers(x)
-        
-        return x
 
 class TransformerCharPredictor(nn.Module):
     def __init__(
@@ -196,28 +97,34 @@ class TransformerCharPredictor(nn.Module):
         self.max_len = max_len
         self.device = device
         
-        
-        self.encoder = TransformerEncoder(
-            input_dim=alphabet_size,
-            hidden_dim=hidden_dim,
-            inner_dim=inner_dim,
-            num_attn_heads=num_attn_heads,
-            dropout=dropout,
-            num_attn_layers=num_attn_layers,
-            max_len=max_len,
-            device = device
+        self.encoding = PositionalEncoding(hidden_dim, max_len, device)
+        self.embedding = nn.Embedding(alphabet_size, hidden_dim)
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=nn.TransformerEncoderLayer(
+                nn.TransformerEncoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_attn_heads,
+                    dim_feedforward=inner_dim,
+                    dropout=dropout,
+                    activation='relu',
+                    device=device,
+                )
+            ),
+            num_layers=num_attn_layers,
         )
         self.head = ClassifierHead(
             in_dim=hidden_dim,
             out_dim=alphabet_size,
             layer_dims=cls_head_dims,
-            dropout=dropout
-        )
+            dropout=dropout,
+        )      
         
         
         self.to(device)
 
     def forward(self, x):
+        x = self.embedding(x)
+        x = self.encoding(x)
         x = self.encoder(x)
         x = self.head(x)
         return x
