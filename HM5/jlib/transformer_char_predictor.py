@@ -250,18 +250,18 @@ class TransformerCharPredictor(nn.Module):
             optimizer_kwargs = {},
             print_epoch=1,
             header_epoch = 15,
-            sched_factor = 0.1,
-            sched_patience = 5,
+            sched_factor = 1,
             min_accuracy = 0.5,
             max_negative_diff_count = 6,
             save_path = None
         ):  
-        
+            
+            lmbda = lambda epoch: sched_factor ** epoch
             header_epoch = print_epoch * header_epoch
             train_start = time.perf_counter()
             self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', patience=sched_patience, factor=sched_factor)
+            self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lmbda)
             self.loss_fn = loss_fn
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
@@ -297,6 +297,9 @@ class TransformerCharPredictor(nn.Module):
             negative_acc_diff_count = 0           
             print("Begin Training")
             for epoch in range(epochs):
+                
+                
+                
                 begin_epoch = time.perf_counter()             
                 
                 #print('train step')
@@ -307,7 +310,7 @@ class TransformerCharPredictor(nn.Module):
                 self.train_loss_hist[epoch] = epoch_train_loss
                 self.val_loss_hist[epoch] = epoch_val_loss
                 self.accuracy_hist[epoch] = accuracy
-                self.scheduler.step(accuracy)
+                self.scheduler.step()
                 
                 
                 end_epoch = time.perf_counter()
