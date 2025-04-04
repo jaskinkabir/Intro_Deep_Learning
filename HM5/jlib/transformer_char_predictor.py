@@ -7,15 +7,68 @@ from torch.amp import GradScaler, autocast
 from torchtnt.utils.data import CudaDataPrefetcher
 import time
 import matplotlib.pyplot as plt
+import json
+from torchprofile import profile_macs
 
 from torch.jit import script
 
-from dataclasses import dataclass
+import dataclasses
 
-class History(dataclass):
-    train_loss_hist: torch.tensor
-    val_loss_hist: torch.tensor
-    accuracy_hist: torch.tensor
+@dataclasses.dataclass
+class History:
+
+    training_time: float = dataclasses.field(default=0)
+    epochs: int = dataclasses.field(default=0)
+    max_accuracy: float = dataclasses.field(default=0)
+    min_val_loss: float = dataclasses.field(default=0)
+    min_train_loss: float = dataclasses.field(default=0)
+    parameter_count: int = dataclasses.field(default=0)
+    macs: int = dataclasses.field(default=0)
+    train_loss_hist: list[float] = dataclasses.field(default_factory=list)
+    val_loss_hist: list[float] = dataclasses.field(default_factory=list)
+    accuracy_hist: list[float] = dataclasses.field(default_factory=list)
+    
+    def __post_init__(self):
+        self.train_loss_hist = self.remove_zeros(self.train_loss_hist)
+        self.val_loss_hist = self.remove_zeros(self.val_loss_hist)
+        self.accuracy_hist = self.remove_zeros(self.accuracy_hist)
+        
+        self.max_accuracy = max(self.accuracy_hist)
+        self.min_val_loss = min(self.val_loss_hist)
+        self.min_train_loss = min(self.train_loss_hist)
+        
+    
+    @classmethod
+    def from_json(cls, path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+        return cls(**data)
+    def save(self, path):
+        with open(path, 'w') as f:
+            json.dump(dataclasses.asdict(self), f, indent=4)
+    def remove_zeros(self, array):
+        return [x for x in array if x != 0]
+    
+    def plot_training(self, title: str) -> plt.Figure:
+        loss_hist = self.train_loss_hist
+        
+        val_loss_hist = self.val_loss_hist
+        validation_accuracy_hist = self.accuracy_hist
+        
+        fig, ax = plt.subplots(1,2, sharex=True)
+        fig.suptitle(title)
+        ax[0].set_title('Loss Over Epochs')
+        ax[0].set_xlabel('Epoch')
+        ax[0].set_ylabel('Loss')
+        ax[0].plot(loss_hist, label='Training Loss')
+        ax[0].plot(val_loss_hist, label='Validation Loss')
+        ax[0].legend()
+        
+        ax[1].set_title('Validation Accuracy')
+        ax[1].set_xlabel('Epoch')
+        ax[1].set_ylabel('%')
+        ax[1].plot(validation_accuracy_hist)
+        return fig  
     
     
     
@@ -128,6 +181,7 @@ class TransformerCharPredictor(nn.Module):
             dropout=dropout,
         )      
         
+        self.param_count = sum(p.numel() for p in self.parameters())
         
         self.to(device)
 
@@ -213,6 +267,9 @@ class TransformerCharPredictor(nn.Module):
             self.accuracy_hist = torch.zeros(epochs)
             d_accuracy = torch.zeros(1)
             
+            test_input = torch.randint(0, self.alphabet_size, (1, 1), device=self.device)
+            macs = profile_macs(self, test_input)
+            
             
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -285,36 +342,23 @@ class TransformerCharPredictor(nn.Module):
                     print('|')
                     print(divider_string)
                     
-
-            print(f'\nTraining Time: {(time.perf_counter() - train_start):4f} seconds\n')
+            training_time = time.perf_counter() - train_start
+            print(f'\nTraining Time: {training_time:4f} seconds\n')
             print(f'Max Accuracy: {max_accuracy.item()*100:4f}')
+            
+            return History(
+                train_loss_hist=self.train_loss_hist.tolist(),
+                val_loss_hist=self.val_loss_hist.tolist(),
+                accuracy_hist=self.accuracy_hist.tolist(),
+                training_time=training_time,
+                parameter_count=self.param_count,
+                macs=macs,
+                epochs=epoch + 1
+            )
 
-    def remove_zeros(self, array):
-        return [x for x in array if x != 0]
+
     
-    def plot_training(self, title: str) -> plt.Figure:
-        loss_hist = self.train_loss_hist.cpu().detach().numpy()
-        loss_hist = self.remove_zeros(loss_hist)
-        
-        val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
-        val_loss_hist = self.remove_zeros(val_loss_hist)
-        validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
-        validation_accuracy_hist = self.remove_zeros(validation_accuracy_hist)
-        
-        fig, ax = plt.subplots(1,2, sharex=True)
-        fig.suptitle(title)
-        ax[0].set_title('Loss Over Epochs')
-        ax[0].set_xlabel('Epoch')
-        ax[0].set_ylabel('Loss')
-        ax[0].plot(loss_hist, label='Training Loss')
-        ax[0].plot(val_loss_hist, label='Validation Loss')
-        ax[0].legend()
-        
-        ax[1].set_title('Validation Accuracy')
-        ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('%')
-        ax[1].plot(validation_accuracy_hist)
-        return fig  
+
     
         
         
