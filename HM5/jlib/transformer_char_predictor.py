@@ -101,14 +101,13 @@ class TransformerCharPredictor(nn.Module):
         self.embedding = nn.Embedding(alphabet_size, hidden_dim)
         self.encoder = nn.TransformerEncoder(
             encoder_layer=nn.TransformerEncoderLayer(
-                nn.TransformerEncoderLayer(
                     d_model=hidden_dim,
                     nhead=num_attn_heads,
                     dim_feedforward=inner_dim,
                     dropout=dropout,
                     activation='relu',
                     device=device,
-                )
+                    batch_first=True
             ),
             num_layers=num_attn_layers,
         )
