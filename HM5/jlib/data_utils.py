@@ -70,7 +70,7 @@ def gen_datasets(text, sequence_length):
     # Create sequences and targets
     sequences = []
     targets = []
-    for i in range(0, len(encoded_text) - sequence_length):
+    for i in range(0, len(encoded_text) - sequence_length,):
         sequence = encoded_text[i:i + sequence_length]
         label_sequence = encoded_text[i+1:i + sequence_length + 1]
         sequences.append(sequence)
@@ -100,7 +100,8 @@ def gen_data_loader(
     workers = 6,
     cpu_prefetch = 10,
     gpu_prefetch = 10,
-    clear=False
+    clear=False,
+    shuffle=True
 ):
     start = time.perf_counter()
     if clear:
@@ -116,7 +117,7 @@ def gen_data_loader(
         num_workers=workers,
         prefetch_factor=cpu_prefetch,
         pin_memory=True,
-        shuffle=True
+        shuffle=shuffle
     )
     
     X_batch = next(iter(loader))[0]

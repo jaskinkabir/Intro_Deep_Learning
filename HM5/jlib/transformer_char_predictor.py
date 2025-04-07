@@ -7,8 +7,72 @@ from torch.amp import GradScaler, autocast
 from torchtnt.utils.data import CudaDataPrefetcher
 import time
 import matplotlib.pyplot as plt
+import json
+from torchprofile import profile_macs
 
 from torch.jit import script
+
+import dataclasses
+
+@dataclasses.dataclass
+class History:
+
+    training_time: float = dataclasses.field(default=0)
+    epochs: int = dataclasses.field(default=0)
+    max_accuracy: float = dataclasses.field(default=0)
+    min_val_loss: float = dataclasses.field(default=0)
+    min_train_loss: float = dataclasses.field(default=0)
+    parameter_count: int = dataclasses.field(default=0)
+    macs: int = dataclasses.field(default=0)
+    train_loss_hist: list[float] = dataclasses.field(default_factory=list)
+    val_loss_hist: list[float] = dataclasses.field(default_factory=list)
+    accuracy_hist: list[float] = dataclasses.field(default_factory=list)
+    
+    def __post_init__(self):
+        self.train_loss_hist = self.remove_zeros(self.train_loss_hist)
+        self.val_loss_hist = self.remove_zeros(self.val_loss_hist)
+        self.accuracy_hist = self.remove_zeros(self.accuracy_hist)
+        
+        self.max_accuracy = max(self.accuracy_hist)
+        maxacc_idx = self.accuracy_hist.index(self.max_accuracy)
+        self.min_val_loss = self.val_loss_hist[maxacc_idx]
+        self.min_train_loss = self.train_loss_hist[maxacc_idx]
+        
+    
+    @classmethod
+    def from_json(cls, path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+        return cls(**data)
+    def save(self, path):
+        with open(path, 'w') as f:
+            json.dump(dataclasses.asdict(self), f, indent=4)
+    def remove_zeros(self, array):
+        return [x for x in array if x != 0]
+    
+    def plot_training(self, title: str) -> plt.Figure:
+        loss_hist = self.train_loss_hist
+        
+        val_loss_hist = self.val_loss_hist
+        validation_accuracy_hist = self.accuracy_hist
+        
+        fig, ax = plt.subplots(1,2, sharex=True)
+        fig.suptitle(title)
+        ax[0].set_title('Loss Over Epochs')
+        ax[0].set_xlabel('Epoch')
+        ax[0].set_ylabel('Loss')
+        ax[0].plot(loss_hist, label='Training Loss')
+        ax[0].plot(val_loss_hist, label='Validation Loss')
+        ax[0].legend()
+        
+        ax[1].set_title('Validation Accuracy')
+        ax[1].set_xlabel('Epoch')
+        ax[1].set_ylabel('%')
+        ax[1].plot(validation_accuracy_hist)
+        return fig  
+    
+    
+    
 
 
 class SequentialSkip(nn.Module):
@@ -59,32 +123,6 @@ class ClassifierHead(nn.Module):
             )
             
 
-
-class FeedForward(nn.Module):
-    def __init__(
-        self,
-        hidden_dim,
-        inner_dim,
-        dropout = 0,      
-    ):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.dropout = dropout
-    
-        self.op = SequentialSkip(
-            nn.Sequential(
-                nn.Linear(hidden_dim, inner_dim),
-                nn.ReLU(),
-                nn.Linear(inner_dim, hidden_dim)
-            ),
-            dropout=dropout
-        )
-        
-    def forward(self, x):
-        return self.op(x)
-        
-
 # Positional Encoding
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000, device='cuda'):
@@ -98,79 +136,6 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         return x + self.encoding[:, :x.size(1)]
-
-class _TransformerEncoderLayer(nn.Module):
-    def __init__(
-        self,
-        hidden_dim,
-        inner_dim,
-        num_heads,       
-        dropout = 0
-    ):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
-        
-        
-        self.attention = nn.MultiheadAttention(hidden_dim, num_heads)
-        self.feed_forward = FeedForward(hidden_dim, inner_dim, dropout=self.dropout)
-        self.layer_norm1 = nn.LayerNorm(hidden_dim)
-        self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        
-    def forward(self, x):
-        # Multi-head attention
-        attn_output, _ = self.attention.forward(x, x, x)
-        x = self.layer_norm1(x + attn_output)
-        
-        # Feed forward network
-        ff_output = self.feed_forward(x)
-        x = self.layer_norm2(x + ff_output)
-        
-        return x
-class TransformerEncoder(nn.Module):
-    def __init__(
-        self,
-        input_dim,
-        hidden_dim,
-        inner_dim,
-        num_attn_heads,
-        num_attn_layers,
-        dropout=0,
-        max_len=5000,
-        device = 'cuda'
-    ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.inner_dim = inner_dim
-        self.num_attn_heads = num_attn_heads
-        self.dropout = dropout
-        self.num_attn_layers = num_attn_layers
-        self.device = device
-        
-        
-        
-        self.embedding = nn.Embedding(input_dim, hidden_dim)
-        self.positional_encoding = PositionalEncoding(hidden_dim, max_len, device)
-        self.encoder_layers = nn.Sequential(*[
-            _TransformerEncoderLayer(
-                hidden_dim,
-                inner_dim,
-                num_attn_heads,
-                dropout
-            )
-            for _ in range(num_attn_layers)
-        ])
-    def forward(self, sequences):
-        # sequences = sequences.to(self.device)
-        x = self.embedding(sequences)
-        x = self.positional_encoding(x)
-        
-        x = self.encoder_layers(x)
-        
-        return x
 
 class TransformerCharPredictor(nn.Module):
     def __init__(
@@ -196,28 +161,34 @@ class TransformerCharPredictor(nn.Module):
         self.max_len = max_len
         self.device = device
         
-        
-        self.encoder = TransformerEncoder(
-            input_dim=alphabet_size,
-            hidden_dim=hidden_dim,
-            inner_dim=inner_dim,
-            num_attn_heads=num_attn_heads,
-            dropout=dropout,
-            num_attn_layers=num_attn_layers,
-            max_len=max_len,
-            device = device
+        self.encoding = PositionalEncoding(hidden_dim, max_len, device)
+        self.embedding = nn.Embedding(alphabet_size, hidden_dim)
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=nn.TransformerEncoderLayer(
+                    d_model=hidden_dim,
+                    nhead=num_attn_heads,
+                    dim_feedforward=inner_dim,
+                    dropout=dropout,
+                    activation='relu',
+                    device=device,
+                    batch_first=True
+            ),
+            num_layers=num_attn_layers,
         )
         self.head = ClassifierHead(
             in_dim=hidden_dim,
             out_dim=alphabet_size,
             layer_dims=cls_head_dims,
-            dropout=dropout
-        )
+            dropout=dropout,
+        )      
         
+        self.param_count = sum(p.numel() for p in self.parameters())
         
         self.to(device)
 
     def forward(self, x):
+        x = self.embedding(x)
+        x = self.encoding(x)
         x = self.encoder(x)
         x = self.head(x)
         return x
@@ -279,22 +250,26 @@ class TransformerCharPredictor(nn.Module):
             optimizer_kwargs = {},
             print_epoch=1,
             header_epoch = 15,
-            sched_factor = 0.1,
-            sched_patience = 5,
+            sched_factor = 1,
             min_accuracy = 0.5,
             max_negative_diff_count = 6,
             save_path = None
         ):  
-        
-        
+            
+            lmbda = lambda epoch: sched_factor ** epoch
+            header_epoch = print_epoch * header_epoch
             train_start = time.perf_counter()
             self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'max', patience=sched_patience, factor=sched_factor)
+            self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lmbda)
             self.loss_fn = loss_fn
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
             self.accuracy_hist = torch.zeros(epochs)
+            d_accuracy = torch.zeros(1)
+            
+            test_input = torch.randint(0, self.alphabet_size, (1, 1), device=self.device)
+            macs = profile_macs(self, test_input)
             
             
             cell_width = 20
@@ -320,22 +295,37 @@ class TransformerCharPredictor(nn.Module):
                 print(divider_string)
             max_accuracy = torch.zeros(1, device=self.device)            
             negative_acc_diff_count = 0           
-            
+            print("Begin Training")
             for epoch in range(epochs):
+                
+                
+                
                 begin_epoch = time.perf_counter()             
                 
-                
+                #print('train step')
                 epoch_train_loss = self.train_step(train_fetcher)
-                
+                #print('val step')
                 epoch_val_loss, accuracy = self.eval_step(val_fetcher)
                 
                 self.train_loss_hist[epoch] = epoch_train_loss
                 self.val_loss_hist[epoch] = epoch_val_loss
                 self.accuracy_hist[epoch] = accuracy
-                self.scheduler.step(accuracy)
+                self.scheduler.step()
                 
                 
                 end_epoch = time.perf_counter()
+                d_accuracy = 100 * (accuracy - max_accuracy) / max_accuracy
+                if d_accuracy <= 0:
+                    negative_acc_diff_count += 1
+                else:
+                    negative_acc_diff_count = 0
+
+                if accuracy > max_accuracy:
+                    max_accuracy = accuracy
+                    if save_path:
+                        torch.save(self.state_dict(), save_path)
+                if stop_on_plateau and (accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count):
+                    break
                 if print_epoch and (epoch % print_epoch == 0 or epoch == epochs - 1) :
                     mem = (torch.cuda.memory_allocated() + torch.cuda.memory_reserved())/1024**3
                     if header_epoch and epoch % header_epoch == 0:
@@ -343,16 +333,6 @@ class TransformerCharPredictor(nn.Module):
                         print(divider_string)
                     epoch_duration = end_epoch - begin_epoch
                     
-                    d_accuracy = torch.zeros(1) if max_accuracy == 0 else 100 * (accuracy - max_accuracy) / max_accuracy
-                    if d_accuracy <= 0:
-                        negative_acc_diff_count += 1
-                    else:
-                        negative_acc_diff_count = 0
-
-                    if accuracy > max_accuracy:
-                        max_accuracy = accuracy
-                        if save_path:
-                            torch.save(self.state_dict(), save_path)
                     
                     epoch_inspection['Epoch'] = f'{epoch}'
                     epoch_inspection['Epoch Time (s)'] = f'{epoch_duration:4f}'
@@ -366,38 +346,23 @@ class TransformerCharPredictor(nn.Module):
                     print('|')
                     print(divider_string)
                     
-                if stop_on_plateau and (accuracy > min_accuracy or negative_acc_diff_count > max_negative_diff_count):
-                    break
-
-            print(f'\nTraining Time: {(time.perf_counter() - train_start)*1000:4f} seconds\n')
+            training_time = time.perf_counter() - train_start
+            print(f'\nTraining Time: {training_time:4f} seconds\n')
             print(f'Max Accuracy: {max_accuracy.item()*100:4f}')
+            
+            return History(
+                train_loss_hist=self.train_loss_hist.tolist(),
+                val_loss_hist=self.val_loss_hist.tolist(),
+                accuracy_hist=self.accuracy_hist.tolist(),
+                training_time=training_time,
+                parameter_count=self.param_count,
+                macs=macs,
+                epochs=epoch + 1
+            )
 
-    def remove_zeros(self, array):
-        return [x for x in array if x != 0]
+
     
-    def plot_training(self, title: str) -> plt.Figure:
-        loss_hist = self.train_loss_hist.cpu().detach().numpy()
-        loss_hist = self.remove_zeros(loss_hist)
-        
-        val_loss_hist = self.val_loss_hist.cpu().detach().numpy()
-        val_loss_hist = self.remove_zeros(val_loss_hist)
-        validation_accuracy_hist = self.accuracy_hist.cpu().detach().numpy()
-        validation_accuracy_hist = self.remove_zeros(validation_accuracy_hist)
-        
-        fig, ax = plt.subplots(1,2, sharex=True)
-        fig.suptitle(title)
-        ax[0].set_title('Loss Over Epochs')
-        ax[0].set_xlabel('Epoch')
-        ax[0].set_ylabel('Loss')
-        ax[0].plot(loss_hist, label='Training Loss')
-        ax[0].plot(val_loss_hist, label='Validation Loss')
-        ax[0].legend()
-        
-        ax[1].set_title('Validation Accuracy')
-        ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('%')
-        ax[1].plot(validation_accuracy_hist)
-        return fig  
+
     
         
         
