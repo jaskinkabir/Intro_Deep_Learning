@@ -8,13 +8,26 @@ import numpy as np
 import requests
 import gc
 
+
+class GpuCIFAR(Dataset):
+    def __init__(self, dataset, device='cuda'):
+        images = torch.stack([x for x, _ in dataset], dim=0).to(device)
+        labels = torch.tensor([y for _, y in dataset]).to(device)
+        self.images = images
+        self.labels = labels
+        self.device = device
+    def __len__(self):
+        return len(self.images)
+    def __getitem__(self, idx):
+        return self.images[idx], self.labels[idx]
+
 image_size = 32
 
 def get_cifar100(path='./data', redownload=False):
     transform = transforms.Compose([
     transforms.Resize((image_size, image_size)),
     transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
     # CIFAR-10 dataset
