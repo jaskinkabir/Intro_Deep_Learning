@@ -24,6 +24,7 @@ class Swin(nn.Module):
             num_labels=num_classes,
             ignore_mismatched_sizes=True,
         ).to(device)
+        self.image_size = 32
         
         for param in self.model.swin.parameters():
             param.requires_grad = False
