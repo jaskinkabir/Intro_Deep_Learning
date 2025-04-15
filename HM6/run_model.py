@@ -1,7 +1,7 @@
 import torch
 import time
 from jlib.vision_transformer import VisionTransformer, History
-from jlib.data_utils import get_cifar_fetchers, get_cifar100, GpuCIFAR
+from jlib.data_utils import gen_fetchers, get_cifar100, GpuCIFAR
 from torch.utils.data import DataLoader
 from matplotlib.figure import Figure
 
@@ -29,7 +29,7 @@ def handle_ctrl_z(signum, frame):
     
 #print(f"Parameter count: {vit.param_count:4e}")
 
-def train_model(model: VisionTransformer,model_name, chart_title, epochs, device='cuda'):
+def train_model(model: VisionTransformer, model_name, chart_title, epochs, device='cuda'):
         
     signal.signal(signal.SIGTSTP, handle_ctrl_z)
         

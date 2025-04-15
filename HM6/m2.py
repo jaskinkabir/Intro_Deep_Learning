@@ -1,6 +1,5 @@
-from test import *
-
-device = 'cuda:1'
+from jlib.vision_transformer import VisionTransformer
+from run_model import train_model
 
 model = VisionTransformer(
     image_size=32,
@@ -10,9 +9,8 @@ model = VisionTransformer(
     num_attn_heads=6,
     num_attn_layers=12,
     num_classes=100,
-    dropout=0.1,
+    dropout=0.2,
     cls_head_dims=[384,192],
-    device=device,
 )
 
 train_model(
@@ -20,7 +18,4 @@ train_model(
     model_name='cifar2',
     chart_title='ViT Model 2',
     epochs=100,
-    device=device
 )
-
-    
