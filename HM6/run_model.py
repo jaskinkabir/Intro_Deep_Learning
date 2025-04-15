@@ -1,7 +1,7 @@
 import torch
 import time
 from jlib.vision_transformer import VisionTransformer, History
-from jlib.data_utils import gen_fetchers, get_cifar100, GpuCIFAR
+from jlib.data_utils import gen_fetchers, get_cifar100
 from torch.utils.data import DataLoader
 from matplotlib.figure import Figure
 
@@ -46,28 +46,13 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
     # del val_data
 
     train_data, val_data = get_cifar100()
-
-    print("loading train")
-    start = time.perf_counter()
-    train_data = GpuCIFAR(train_data, device=device)
-    train_load_time = time.perf_counter() - start
-    print(f"Train data load time: {train_load_time:2f} s")
-    print("loading val")
-    start = time.perf_counter()
-    val_data = GpuCIFAR(val_data, device=device)
-    val_load_time = time.perf_counter() - start
-    print(f"Val data load time: {val_load_time:2f} s")
-
-
-    print("init train loader")
-    train_fetcher = DataLoader(
+    train_fetcher, val_fetcher = gen_fetchers(
         train_data,
-        batch_size=512
-    )
-    print("init val loader")
-    val_fetcher = DataLoader(
         val_data,
-        batch_size=len(val_data)
+        train_batch_size=512,
+        workers=35,
+        cpu_prefetch=30,
+        gpu_prefetch=30,
     )
 
     hist: History = model.train_model(
