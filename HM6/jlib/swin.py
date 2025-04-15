@@ -40,7 +40,7 @@ class Swin(nn.Module):
             # eps=1e-8,
         )
         self.param_count = sum(p.numel() for p in self.model.parameters())
-        print(f'Params: {param_count:4e}')
+        print(f'Params: {self.param_count:4e}')
     def forward(self, x):
         return self.model(x).logits
     
