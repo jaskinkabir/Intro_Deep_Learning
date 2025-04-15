@@ -19,7 +19,7 @@ def handle_ctrl_z(signum, frame):
     
 #print(f"Parameter count: {vit.param_count:4e}")
 
-def train_model(model: VisionTransformer, model_name, chart_title, epochs, device='cuda', lr=5e-4):
+def train_model(model: VisionTransformer, model_name, chart_title, epochs, device='cuda', lr=5e-4, swin=None):
         
     signal.signal(signal.SIGTSTP, handle_ctrl_z)
         
@@ -35,7 +35,7 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
     # )
     # del val_data
 
-    train_data, val_data = get_cifar100()
+    train_data, val_data = get_cifar100(swin=swin)
     train_fetcher, val_fetcher = gen_fetchers(
         train_data,
         val_data,

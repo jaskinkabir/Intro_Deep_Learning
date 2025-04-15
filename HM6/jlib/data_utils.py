@@ -14,10 +14,12 @@ image_size = 32
 
 def get_cifar100(path='./data', redownload=False, swin=None):
     if swin is not None:
+        image_size = 224
         processor = AutoImageProcessor.from_pretrained(swin)
         mean = processor.image_mean
         std = processor.image_std
     else:
+        image_size = 32
         mean = (0.5, 0.5, 0.5)
         std = (0.5, 0.5, 0.5)
     
