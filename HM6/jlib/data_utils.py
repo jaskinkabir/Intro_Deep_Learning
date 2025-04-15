@@ -33,7 +33,8 @@ def gen_data_loader(
     cpu_prefetch = 10,
     gpu_prefetch = 10,
     clear=False,
-    shuffle=True
+    shuffle=True,
+    device='cuda'
 ):
     start = time.perf_counter()
     if clear:
@@ -61,7 +62,7 @@ def gen_data_loader(
     fetcher = CudaDataPrefetcher(
         data_iterable=loader,
         num_prefetch_batches=gpu_prefetch,
-        device=torch.device('cuda')
+        device=device
     )
     print(f"Fetcher init time: {time.perf_counter() - start:2f} s")
     return fetcher
@@ -83,6 +84,7 @@ def gen_fetchers(
     max_gpu_mem= 30 * 1024**3,
     cpu_prefetch=None,
     gpu_prefetch=None,
+    device='cuda',
 ):
     """
     Returns a dictionary containing the following
@@ -133,7 +135,8 @@ def gen_fetchers(
         train_batch_size,
         train_workers,
         int(train_cpu_prefetch),
-        int(train_gpu_prefetch)
+        int(train_gpu_prefetch),
+        device=device
     )
     print("Val Loader")
     val_loader = gen_data_loader(
@@ -141,7 +144,8 @@ def gen_fetchers(
         val_batch_size,
         val_workers,
         int(val_cpu_prefetch),
-        int(val_gpu_prefetch)
+        int(val_gpu_prefetch),
+        device=device,
     )
     
     return train_loader, val_loader

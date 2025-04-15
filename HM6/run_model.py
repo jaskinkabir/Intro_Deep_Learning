@@ -39,10 +39,11 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
     train_fetcher, val_fetcher = gen_fetchers(
         train_data,
         val_data,
-        train_batch_size=512,
+        train_batch_size=1024,
         workers=35,
         cpu_prefetch=30,
         gpu_prefetch=30,
+        device=device,
     )
 
     hist: History = model.train_model(
