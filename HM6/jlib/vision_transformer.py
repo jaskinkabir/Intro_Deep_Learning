@@ -137,7 +137,6 @@ class VisionTransformer(nn.Module):
         num_attn_layers: int,
         cls_head_dims: list,
         dropout = 0,
-        max_len: int = 5000,
         device: str = 'cuda'        
     ):
         super().__init__()
@@ -150,7 +149,6 @@ class VisionTransformer(nn.Module):
         self.num_attn_layers = num_attn_layers
         self.cls_head_dims = cls_head_dims
         self.dropout = dropout
-        self.max_len = max_len
         self.device = device
         
         self.embedding = PatchEmbedding(
@@ -359,7 +357,8 @@ class VisionTransformer(nn.Module):
                         print(f"|{value:^{cell_width}}", end='')
                     print('|')
                     print(divider_string)
-                    
+                
+                torch.cuda.empty_cache()    
             training_time = time.perf_counter() - train_start
             print(f'\nTraining Time: {training_time:4f} seconds\n')
             print(f'Max Accuracy: {max_accuracy.item()*100:4f}')
