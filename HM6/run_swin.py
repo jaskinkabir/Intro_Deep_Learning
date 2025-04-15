@@ -1,6 +1,7 @@
 import torch
 import time
 from jlib.swin import Swin
+from jlib.vision_transformer import History
 from jlib.data_utils import gen_fetchers, get_cifar100
 from torch.utils.data import DataLoader
 from matplotlib.figure import Figure
