@@ -1,15 +1,14 @@
 from jlib.vision_transformer import VisionTransformer
 from run_model import train_model
-
 device = 'cuda:3'
 
-model = VisionTransformer(
+vit = VisionTransformer(
     image_size=32,
     patch_size=8,
     embed_dim=192,
-    inner_dim=768,
-    num_attn_heads=8,
-    num_attn_layers=16,
+    inner_dim=384,
+    num_attn_heads=4,
+    num_attn_layers=8,
     num_classes=100,
     dropout=0.2,
     cls_head_dims=[384,192],
@@ -17,9 +16,9 @@ model = VisionTransformer(
 )
 
 train_model(
-    model=model,
-    model_name='vit4',
-    chart_title='ViT Model 4',
+    model=vit,
+    model_name='8p8l',
+    chart_title='ViT Patch:8 Layers:8',
     epochs=50,
     device=device,
 )
