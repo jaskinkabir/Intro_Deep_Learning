@@ -17,6 +17,6 @@ train_model(
     model=vit,
     model_name='vit1',
     chart_title='ViT Model 1',
-    epochs=100,
+    epochs=50,
     device='cuda'
 )
