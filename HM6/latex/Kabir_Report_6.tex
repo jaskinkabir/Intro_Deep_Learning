@@ -40,23 +40,25 @@ complexities can be seen in Table
 
 \begin{table}[h]
     \centering % Center the table
-    \begin{tabular}{|c|c|c|}
+    \begin{tabular}{|c|c|c|c|c|}
         \hline
-        \textbf{Model} & \textbf{Parameters} & \textbf{MACs} \\
+        \textbf{Model} & \textbf{Parameters} & \textbf{MACs} & \textbf{Training Time} & \textbf{Accuracy}  \\
         \hline
-        \textbf{Patch4 Attn4} & 1,377,508 & 756,480 \\
+        \textbf{Patch4 Attn4} & 1,377,508 & 756,480 & 588.2s & 43.9\% \\
         \hline
-        \textbf{Patch4 Attn8} & 2,565,604 & 756,480 \\
+        \textbf{Patch4 Attn8} & 2,565,604 & 756,480 & 753.7s & 44.6\% \\
         \hline
-        \textbf{Patch8 Attn4} & 1,395,940 & 756,480 \\
+        \textbf{Patch8 Attn4} & 1,395,940 & 756,480 & 529.2s & 37.9\% \\
         \hline
-        \textbf{Patch8 Attn8} & 2,584,036 & 756,480 \\
+        \textbf{Patch8 Attn8} & 2,584,036 & 756,480 & 576.6s & 37.7\% \\
         \hline
     \end{tabular}
     \caption{Model Complexities}
     \label{tab:complexities}
 \end{table}
 
+\subsection{Training}
+The models were trained on the CIFAR-100 dataset with a batch size of 1024, and learning rate of 5e-4. 
 
 % image_size=32,
 % patch_size=4,

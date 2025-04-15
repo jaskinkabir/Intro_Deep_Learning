@@ -25,7 +25,7 @@ class Swin(nn.Module):
             num_labels=num_classes,
             ignore_mismatched_sizes=True,
         ).to(device)
-        self.image_size = 32
+        self.image_size = 224
         
         for param in self.model.swin.parameters():
             param.requires_grad = False
@@ -107,7 +107,10 @@ class Swin(nn.Module):
             
             lmbda = lambda epoch: sched_factor ** epoch
             header_epoch = print_epoch * header_epoch
-            train_start = time.perf_counter()
+            test_input = torch.randn(1, 3, self.image_size, self.image_size).to(self.device)
+            self.eval()
+            with torch.no_grad():
+                macs = profile_macs(self, test_input)
             self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lmbda)
@@ -141,6 +144,7 @@ class Swin(nn.Module):
             max_accuracy = torch.zeros(1, device=self.device)            
             negative_acc_diff_count = 0           
             print("Begin Training")
+            train_start = time.perf_counter()
             for epoch in range(epochs):
                 
                 
@@ -202,6 +206,6 @@ class Swin(nn.Module):
                 accuracy_hist=self.accuracy_hist.tolist(),
                 training_time=training_time,
                 parameter_count=self.param_count,
-                macs=0,
+                macs=macs,
                 epochs=epoch + 1,
             )
