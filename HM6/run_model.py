@@ -39,7 +39,7 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
     train_fetcher, val_fetcher = gen_fetchers(
         train_data,
         val_data,
-        train_batch_size=1024,
+        train_batch_size=64,
         workers=35,
         cpu_prefetch=30,
         gpu_prefetch=30,
@@ -65,8 +65,8 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
         max_negative_diff_count=10
     )
 
-    hist.save(f'models/{model_name}.json')
+    hist.save(f'models/{model_name}-64.json')
     fig: Figure = hist.plot_training(chart_title)
-    fig.savefig(f'latex/images/{model_name}.png')
+    fig.savefig(f'latex/images/{model_name}-64.png')
 
 
