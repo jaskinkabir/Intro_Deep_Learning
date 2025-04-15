@@ -30,9 +30,9 @@ class Resnet18(nn.Module):
             param.requires_grad = True
         self.param_count = sum(p.numel() for p in self.model.parameters())
         print(f'Params: {self.param_count:4e}')
+        self.to(device)
     def forward(self, x):
-        return self.model(x).logits
-    
+        return self.model(x)    
     
     def train_step(self, fetcher, num_batches):
         epoch_train_loss = torch.zeros(1, device=self.device)
@@ -96,7 +96,6 @@ class Resnet18(nn.Module):
             
             lmbda = lambda epoch: sched_factor ** epoch
             header_epoch = print_epoch * header_epoch
-            train_start = time.perf_counter()
             self.scaler = GradScaler("cuda")
             self.optimizer = optimizer(self.parameters(), *optimizer_args, **optimizer_kwargs)
             self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=lmbda)
@@ -104,7 +103,14 @@ class Resnet18(nn.Module):
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
             self.accuracy_hist = torch.zeros(epochs)
-            d_accuracy = torch.zeros(1)         
+            d_accuracy = torch.zeros(1)
+            
+            test_in = torch.randn(1, 3, self.image_size, self.image_size).to(self.device)
+            with torch.no_grad():
+                self.eval()
+                macs = profile_macs(self, test_in)
+                print(f'MACs: {macs:4e}')
+            self.macs = macs         
                         
             cell_width = 20
             header_form_spec = f'^{cell_width}'
@@ -130,6 +136,7 @@ class Resnet18(nn.Module):
             max_accuracy = torch.zeros(1, device=self.device)            
             negative_acc_diff_count = 0           
             print("Begin Training")
+            train_start = time.perf_counter()
             for epoch in range(epochs):
                 
                 
@@ -191,6 +198,6 @@ class Resnet18(nn.Module):
                 accuracy_hist=self.accuracy_hist.tolist(),
                 training_time=training_time,
                 parameter_count=self.param_count,
-                macs=0,
+                macs=self.macs,
                 epochs=epoch + 1,
             )

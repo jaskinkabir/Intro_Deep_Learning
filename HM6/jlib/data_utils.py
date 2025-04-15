@@ -3,6 +3,7 @@ import time
 import torchvision
 import torchvision.transforms as transforms
 from torchtnt.utils.data import CudaDataPrefetcher
+from torchvision.models import resnet18, ResNet18_Weights
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import requests
@@ -12,22 +13,30 @@ import gc
 
 image_size = 32
 
-def get_cifar100(path='./data', redownload=False, swin=None):
+def get_cifar100(path='./data', redownload=False, swin=None, resnet=False):
     if swin is not None:
         image_size = 224
         processor = AutoImageProcessor.from_pretrained(swin)
         mean = processor.image_mean
         std = processor.image_std
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
+    elif resnet:
+        image_size = 224
+        transform = ResNet18_Weights.IMAGENET1K_V1.transforms
     else:
         image_size = 32
         mean = (0.5, 0.5, 0.5)
         std = (0.5, 0.5, 0.5)
-    
-    transform = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
+        
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
 
     # CIFAR-10 dataset
     train_dataset = torchvision.datasets.CIFAR100(root=path, train=True,
