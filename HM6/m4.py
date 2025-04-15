@@ -13,6 +13,7 @@ model = VisionTransformer(
     num_classes=100,
     dropout=0.2,
     cls_head_dims=[384,192],
+    device=device,
 )
 
 train_model(
