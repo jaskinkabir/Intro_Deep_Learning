@@ -113,15 +113,8 @@ class Swin(nn.Module):
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
             self.accuracy_hist = torch.zeros(epochs)
-            d_accuracy = torch.zeros(1)
-            
-            test_input = torch.randn(1, 3, self.image_size, self.image_size).to(self.device)
-            self.eval()
-            with torch.no_grad():
-                macs = profile_macs(self, test_input)
-            
-            
-            
+            d_accuracy = torch.zeros(1)         
+                        
             cell_width = 20
             header_form_spec = f'^{cell_width}'
             
@@ -207,6 +200,6 @@ class Swin(nn.Module):
                 accuracy_hist=self.accuracy_hist.tolist(),
                 training_time=training_time,
                 parameter_count=self.param_count,
-                macs=macs,
+                macs=0,
                 epochs=epoch + 1
             )
