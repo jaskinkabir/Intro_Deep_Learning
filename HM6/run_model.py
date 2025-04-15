@@ -9,17 +9,7 @@ from matplotlib.figure import Figure
 import signal
 import sys
 
-vit = VisionTransformer(
-    image_size=32,
-    patch_size=4,
-    embed_dim=256,
-    inner_dim=512,
-    num_attn_heads=4,
-    num_attn_layers=8,
-    num_classes=100,
-    dropout=0.3,
-    cls_head_dims=[1024,128]
-)
+
 def handle_ctrl_z(signum, frame):
     print("\nCaught Ctrl+Z, terminating process and freeing GPU memory...")
     # Clean up CUDA memory before exiting
@@ -58,7 +48,7 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
     hist: History = model.train_model(
         epochs=epochs,
         train_fetcher=train_fetcher,
-        num_train_batches=len(train_fetcher),
+        num_train_batches=len(train_fetcher.data_iterable),
         val_fetcher=val_fetcher,
         num_val_batches=1,
         loss_fn=torch.nn.CrossEntropyLoss(label_smoothing=0.1),
