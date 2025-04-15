@@ -19,7 +19,7 @@ def handle_ctrl_z(signum, frame):
     
 #print(f"Parameter count: {vit.param_count:4e}")
 
-def train_model(model: VisionTransformer, model_name, chart_title, epochs, device='cuda'):
+def train_model(model: VisionTransformer, model_name, chart_title, epochs, device='cuda', lr=5e-4):
         
     signal.signal(signal.SIGTSTP, handle_ctrl_z)
         
@@ -55,7 +55,7 @@ def train_model(model: VisionTransformer, model_name, chart_title, epochs, devic
         loss_fn=torch.nn.CrossEntropyLoss(label_smoothing=0.1),
         optimizer=torch.optim.AdamW,
         optimizer_kwargs={
-            'lr': 5e-4,
+            'lr': lr,
             'weight_decay': 5e-2,
             'betas': (0.9, 0.999),
             'eps': 1e-8,

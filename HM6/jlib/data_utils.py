@@ -6,16 +6,25 @@ from torchtnt.utils.data import CudaDataPrefetcher
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import requests
+from transformers import AutoImageProcessor
 import gc
 
 
 image_size = 32
 
-def get_cifar100(path='./data', redownload=False):
+def get_cifar100(path='./data', redownload=False, swin=None):
+    if swin is not None:
+        processor = AutoImageProcessor.from_pretrained(swin)
+        mean = processor.image_mean
+        std = processor.image_std
+    else:
+        mean = (0.5, 0.5, 0.5)
+        std = (0.5, 0.5, 0.5)
+    
     transform = transforms.Compose([
-    transforms.Resize((image_size, image_size)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
     ])
 
     # CIFAR-10 dataset
@@ -25,6 +34,8 @@ def get_cifar100(path='./data', redownload=False):
                                             download=redownload, transform=transform)
     
     return train_dataset, test_dataset
+
+
 
 def gen_data_loader(
     dataset,
