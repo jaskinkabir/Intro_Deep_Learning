@@ -36,6 +36,7 @@ def gen_data_loader(
     shuffle=True,
     device='cuda'
 ):
+    device = torch.device(device)
     start = time.perf_counter()
     if clear:
         torch.cuda.empty_cache()
