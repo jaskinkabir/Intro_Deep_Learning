@@ -39,6 +39,8 @@ class Swin(nn.Module):
             # betas=(0.9, 0.999),
             # eps=1e-8,
         )
+        self.param_count = sum(p.numel() for p in self.model.parameters())
+        print(f'Params: {param_count:4e}')
     def forward(self, x):
         return self.model(x).logits
     
@@ -201,5 +203,5 @@ class Swin(nn.Module):
                 training_time=training_time,
                 parameter_count=self.param_count,
                 macs=0,
-                epochs=epoch + 1
+                epochs=epoch + 1,
             )
