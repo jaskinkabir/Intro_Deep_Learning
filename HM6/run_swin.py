@@ -41,7 +41,7 @@ def train_model(model: Swin, model_name, chart_title, epochs, device='cuda', lr=
         train_data,
         val_data,
         train_batch_size=32,
-        val_batch_size = None,
+        val_batch_size = 1024,
         workers=35,
         cpu_prefetch=30,
         gpu_prefetch=30,
