@@ -14,7 +14,7 @@ def handle_ctrl_z(signum, frame):
     
 #print(f"Parameter count: {vit.param_count:4e}")
 
-def train_model(model, model_name, chart_title, epochs, device='cuda', lr=5e-5, swin=None):
+def train_model(model, model_name, chart_title, epochs, device='cuda', lr=1e-3):
         
     signal.signal(signal.SIGTSTP, handle_ctrl_z)
         
@@ -30,7 +30,7 @@ def train_model(model, model_name, chart_title, epochs, device='cuda', lr=5e-5, 
     # )
     # del val_data
 
-    train_data, val_data = get_cifar100(swin=swin)
+    train_data, val_data = get_cifar100(resnet=True)
     train_fetcher, val_fetcher = gen_fetchers(
         train_data,
         val_data,
