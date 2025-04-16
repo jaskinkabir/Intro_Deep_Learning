@@ -35,7 +35,7 @@ def train_model(model, model_name, chart_title, epochs, device='cuda', lr=1e-3):
         train_data,
         val_data,
         train_batch_size=64,
-        workers=15,
+        workers=35,
         cpu_prefetch=30,
         gpu_prefetch=30,
         device=device,

@@ -26,7 +26,7 @@ def get_cifar100(path='./data', redownload=False, swin=None, resnet=False):
         ])
     elif resnet:
         image_size = 224
-        transform = ResNet18_Weights.IMAGENET1K_V1.transforms
+        transform = ResNet18_Weights.IMAGENET1K_V1.transforms()
     else:
         image_size = 32
         mean = (0.5, 0.5, 0.5)
