@@ -20,7 +20,7 @@ def handle_ctrl_z(signum, frame):
     
 #print(f"Parameter count: {vit.param_count:4e}")
 
-def train_model(model: Swin, model_name, chart_title, epochs, device='cuda', lr=5e-4, swin=None):
+def train_model(model: Swin, model_name, chart_title, epochs, device='cuda', lr=1e-3, swin=None):
         
     signal.signal(signal.SIGTSTP, handle_ctrl_z)
         
