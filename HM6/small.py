@@ -9,6 +9,6 @@ train_model(
     model_name='swin_small',
     chart_title='Swin Small',
     epochs=5,
-    lr=2e-5,
+    lr=1e-3,
     device=device,
 )
