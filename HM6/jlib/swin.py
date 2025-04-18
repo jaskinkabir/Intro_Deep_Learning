@@ -1,6 +1,7 @@
+import transformers
 import torch
 import torch.nn as nn
-
+from jlib.vision_transformer import History
 import numpy as np
 import torch.nn.functional as F
 import time
@@ -11,199 +12,38 @@ import matplotlib.pyplot as plt
 import json
 from torchprofile import profile_macs
 
-from torch.jit import script
+device = 'cuda:0'
 
-import dataclasses
-
-@dataclasses.dataclass
-class History:
-
-    training_time: float = dataclasses.field(default=0)
-    epochs: int = dataclasses.field(default=0)
-    max_accuracy: float = dataclasses.field(default=0)
-    min_val_loss: float = dataclasses.field(default=0)
-    min_train_loss: float = dataclasses.field(default=0)
-    parameter_count: int = dataclasses.field(default=0)
-    macs: int = dataclasses.field(default=0)
-    train_loss_hist: list = dataclasses.field(default_factory=list)
-    val_loss_hist: list = dataclasses.field(default_factory=list)
-    accuracy_hist: list = dataclasses.field(default_factory=list)
-    
-    def __post_init__(self):
-        self.train_loss_hist = self.remove_zeros(self.train_loss_hist)
-        self.val_loss_hist = self.remove_zeros(self.val_loss_hist)
-        self.accuracy_hist = self.remove_zeros(self.accuracy_hist)
-        
-        self.max_accuracy = max(self.accuracy_hist)
-        maxacc_idx = self.accuracy_hist.index(self.max_accuracy)
-        self.min_val_loss = self.val_loss_hist[maxacc_idx]
-        self.min_train_loss = self.train_loss_hist[maxacc_idx]
-        
-    
-    @classmethod
-    def from_json(cls, path):
-        with open(path, 'r') as f:
-            data = json.load(f)
-        return cls(**data)
-    def save(self, path):
-        with open(path, 'w') as f:
-            json.dump(dataclasses.asdict(self), f, indent=4)
-    def remove_zeros(self, array):
-        return [x for x in array if x != 0]
-    
-    def plot_training(self, title: str) -> plt.Figure:
-        loss_hist = self.train_loss_hist
-        
-        val_loss_hist = self.val_loss_hist
-        validation_accuracy_hist = self.accuracy_hist
-        
-        fig, ax = plt.subplots(1,2, sharex=True)
-        fig.suptitle(title)
-        ax[0].set_title('Loss Over Epochs')
-        ax[0].set_xlabel('Epoch')
-        ax[0].set_ylabel('Loss')
-        ax[0].plot(loss_hist, label='Training Loss')
-        ax[0].plot(val_loss_hist, label='Validation Loss')
-        ax[0].legend()
-        
-        ax[1].set_title('Validation Accuracy')
-        ax[1].set_xlabel('Epoch')
-        ax[1].set_ylabel('%')
-        ax[1].plot(validation_accuracy_hist)
-        return fig  
-
-class PatchEmbedding(nn.Module):
-    def __init__(self, image_size, patch_size, in_channels=3, embed_dim=256):
+class Swin(nn.Module):
+    def __init__(self, model_name, num_classes=100, device='cuda'):
         super().__init__()
-        self.image_size = image_size
-        self.patch_size = patch_size
-        self.in_channels = in_channels
-        self.embed_dim = embed_dim
-        
-        self.num_patches = (image_size // patch_size) ** 2
-        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
-    def forward(self, x:torch.Tensor):
-        x = self.proj(x)
-        x = x.flatten(2)
-        x = x.transpose(1,2)
-        return x
-
-
-
-    
-class ClassifierHead(nn.Module):
-    def __init__(
-        self,
-        in_dim,
-        out_dim,
-        layer_dims,
-        dropout = 0,
-    ):
-        super().__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.layer_dims = layer_dims
-        self.dropout = dropout
-        
-        layer_dims = [in_dim] + layer_dims + [out_dim]
-        
-        layers = []
-        for i in range(1, len(layer_dims)):
-            linear_in = layer_dims[i-1]
-            linear_out = layer_dims[i]
-            layers.append(self._get_linear_layer(linear_in, linear_out))
-        self.layers = nn.Sequential(*layers)
-    def forward(self, x):
-        return self.layers(x)
-        
-    
-    def _get_linear_layer(self, in_dim, out_dim):
-            return nn.Sequential(
-                nn.Linear(in_dim, out_dim),
-                nn.ReLU(),
-                nn.Dropout(self.dropout),
-            )
-
-
-class VisionTransformer(nn.Module):
-    def __init__(
-        self,
-        image_size: int,
-        patch_size: int,
-        embed_dim: int,
-        inner_dim: int,
-        num_classes: int,
-        num_attn_heads: int,
-        num_attn_layers: int,
-        cls_head_dims: list,
-        dropout = 0,
-        device: str = 'cuda'        
-    ):
-        super().__init__()
-        self.image_size = image_size
-        self.patch_size = patch_size
-        self.embed_dim = embed_dim
-        self.inner_dim = inner_dim
-        self.num_classes = num_classes
-        self.num_attn_heads = num_attn_heads
-        self.num_attn_layers = num_attn_layers
-        self.cls_head_dims = cls_head_dims
-        self.dropout = dropout
         self.device = device
+        self.model_name = model_name
+        self.num_classes = num_classes
+        self.model = transformers.SwinForImageClassification.from_pretrained(
+            model_name,
+            num_labels=num_classes,
+            ignore_mismatched_sizes=True,
+        ).to(device)
+        self.image_size = 224
         
-        self.embedding = PatchEmbedding(
-            image_size=image_size,
-            patch_size=patch_size,
-            in_channels=3,
-            embed_dim=embed_dim
+        for param in self.model.swin.parameters():
+            param.requires_grad = False
+        for param in self.model.classifier.parameters():
+            param.requires_grad = True
+        self.loss = torch.nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=2e-5,
+            # weight_decay=1e-2,
+            # betas=(0.9, 0.999),
+            # eps=1e-8,
         )
-        
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.num_patches = self.embedding.num_patches
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + 1, embed_dim))
-        self.dropout = nn.Dropout(dropout)
-        
-        
-        self.encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(
-                d_model=embed_dim,
-                nhead=num_attn_heads,
-                dim_feedforward=inner_dim,
-                dropout=dropout,
-                activation='gelu',
-                batch_first=True,
-                device=device
-            ),
-            num_layers=num_attn_layers,
-        )
-        
-        
-        self.head = ClassifierHead(
-            in_dim=embed_dim,
-            out_dim=num_classes,
-            layer_dims=cls_head_dims,
-            dropout=dropout,
-        )      
-        
-        self.param_count = sum(p.numel() for p in self.parameters())
-        
-        self.to(device)
-
+        self.param_count = sum(p.numel() for p in self.model.parameters())
+        print(f'Params: {self.param_count:4e}')
     def forward(self, x):
-        batch_size = x.shape[0]
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
-        x = self.embedding(x)
-        x = torch.cat((cls_tokens, x), dim=1)
-        x += self.pos_embed
-        x = self.dropout(x)
-        x = self.encoder(x)
-        x = x[:, 0]
-        x = self.head(x)
-        return x
+        return self.model(x).logits
     
-    def predict(self, x):
-        return torch.argmax(self.forward(x), dim=-1)
-
     
     def train_step(self, fetcher, num_batches):
         epoch_train_loss = torch.zeros(1, device=self.device)
@@ -278,11 +118,8 @@ class VisionTransformer(nn.Module):
             self.train_loss_hist = torch.zeros(epochs)
             self.val_loss_hist = torch.zeros(epochs)
             self.accuracy_hist = torch.zeros(epochs)
-            d_accuracy = torch.zeros(1)
-            
-            
-            
-            
+            d_accuracy = torch.zeros(1)         
+                        
             cell_width = 20
             header_form_spec = f'^{cell_width}'
             
@@ -370,13 +207,5 @@ class VisionTransformer(nn.Module):
                 training_time=training_time,
                 parameter_count=self.param_count,
                 macs=macs,
-                epochs=epoch + 1
+                epochs=epoch + 1,
             )
-
-
-    
-
-    
-        
-        
-

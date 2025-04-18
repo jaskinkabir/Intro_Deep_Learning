@@ -3,32 +3,40 @@ import time
 import torchvision
 import torchvision.transforms as transforms
 from torchtnt.utils.data import CudaDataPrefetcher
+from torchvision.models import resnet18, ResNet18_Weights
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import requests
+from transformers import AutoImageProcessor
 import gc
 
 
-class GpuCIFAR(Dataset):
-    def __init__(self, dataset, device='cuda'):
-        images = torch.stack([x for x, _ in dataset], dim=0).to(device)
-        labels = torch.tensor([y for _, y in dataset]).to(device)
-        self.images = images
-        self.labels = labels
-        self.device = device
-    def __len__(self):
-        return len(self.images)
-    def __getitem__(self, idx):
-        return self.images[idx], self.labels[idx]
-
 image_size = 32
 
-def get_cifar100(path='./data', redownload=False):
-    transform = transforms.Compose([
-    transforms.Resize((image_size, image_size)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ])
+def get_cifar100(path='./data', redownload=False, swin=None, resnet=False):
+    if swin is not None:
+        image_size = 224
+        processor = AutoImageProcessor.from_pretrained(swin)
+        mean = processor.image_mean
+        std = processor.image_std
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
+    elif resnet:
+        image_size = 224
+        transform = ResNet18_Weights.IMAGENET1K_V1.transforms()
+    else:
+        image_size = 32
+        mean = (0.5, 0.5, 0.5)
+        std = (0.5, 0.5, 0.5)
+        
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
 
     # CIFAR-10 dataset
     train_dataset = torchvision.datasets.CIFAR100(root=path, train=True,
@@ -38,6 +46,8 @@ def get_cifar100(path='./data', redownload=False):
     
     return train_dataset, test_dataset
 
+
+
 def gen_data_loader(
     dataset,
     batch_size = 8192,
@@ -45,8 +55,10 @@ def gen_data_loader(
     cpu_prefetch = 10,
     gpu_prefetch = 10,
     clear=False,
-    shuffle=True
+    shuffle=True,
+    device='cuda'
 ):
+    device = torch.device(device)
     start = time.perf_counter()
     if clear:
         torch.cuda.empty_cache()
@@ -73,7 +85,7 @@ def gen_data_loader(
     fetcher = CudaDataPrefetcher(
         data_iterable=loader,
         num_prefetch_batches=gpu_prefetch,
-        device=torch.device('cuda')
+        device=device
     )
     print(f"Fetcher init time: {time.perf_counter() - start:2f} s")
     return fetcher
@@ -85,14 +97,17 @@ def get_batch_space(dataset, batch_size):
     del val_batch, X_batch
     return res
 
-def get_cifar_fetchers(
-    train_batch_size,
-    val_batch_size,
-    redownload=False,
+def gen_fetchers(
+    train_dataset,
+    val_dataset,
+    train_batch_size=None,
+    val_batch_size=None,
+    train_split=0.8,
     workers=30,
     max_gpu_mem= 30 * 1024**3,
     cpu_prefetch=None,
     gpu_prefetch=None,
+    device='cuda',
 ):
     """
     Returns a dictionary containing the following
@@ -104,12 +119,17 @@ def get_cifar_fetchers(
         'alphabet': Alphabet object containing character mappings
     }
     """
-    train_dataset, val_dataset = get_cifar100(redownload=redownload)  
+    if val_batch_size is None:
+        val_batch_size = len(val_dataset)
+    if train_batch_size is None:
+        train_batch_size = len(train_dataset)
     
+    def split(x):
+        return int(x * train_split), int(x * (1 - train_split))
     
+    max_train_mem, max_val_mem = split(max_gpu_mem)
+    train_workers, val_workers = split(workers)
     
-    max_train_mem = max_gpu_mem * 2 // 3
-    max_val_mem = max_gpu_mem // 3
     
     train_workers = workers * 2 // 3
     val_workers = workers // 3
@@ -128,10 +148,8 @@ def get_cifar_fetchers(
         print(f"Val GPU Prefetch: {val_gpu_prefetch}")
         print(f"Val CPU Prefetch: {val_cpu_prefetch}")
     else:
-        train_cpu_prefetch = cpu_prefetch * 2 //3
-        train_gpu_prefetch = gpu_prefetch * 2 //3
-        val_cpu_prefetch = cpu_prefetch // 3
-        val_gpu_prefetch = gpu_prefetch // 3
+        train_cpu_prefetch, val_cpu_prefetch = split(cpu_prefetch)
+        train_gpu_prefetch, val_gpu_prefetch = split(gpu_prefetch)
         
     
     print("Train Loader")
@@ -140,7 +158,8 @@ def get_cifar_fetchers(
         train_batch_size,
         train_workers,
         int(train_cpu_prefetch),
-        int(train_gpu_prefetch)
+        int(train_gpu_prefetch),
+        device=device
     )
     print("Val Loader")
     val_loader = gen_data_loader(
@@ -148,7 +167,8 @@ def get_cifar_fetchers(
         val_batch_size,
         val_workers,
         int(val_cpu_prefetch),
-        int(val_gpu_prefetch)
+        int(val_gpu_prefetch),
+        device=device,
     )
     
     return train_loader, val_loader
