@@ -1,6 +1,6 @@
 from jlib.swin import Swin
 from run_swin import train_model
-device = 'cuda:1'
+device = 'cuda'
 
 model = Swin(model_name='microsoft/swin-small-patch4-window7-224', num_classes=100, device=device)
 train_model(

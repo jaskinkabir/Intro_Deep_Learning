@@ -1,6 +1,6 @@
 from jlib.vision_transformer import VisionTransformer
 from run_model import train_model
-device = 'cuda:2'
+device = 'cuda'
 
 vit = VisionTransformer(
     image_size=32,
